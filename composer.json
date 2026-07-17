@@ -1,11 +1,13 @@
 {
-  "name": "velo/router",
+  "name": "skislemleko11/velo-router",
   "description": "Router component for Velo framework",
   "type": "library",
   "license": "LGPL-3.0",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
   "require": {
     "php": ">=8.5",
-    "velo/http": "*",
+    "skislemleko11/velo-http": "*",
     "psr/container": "^2.0"
   },
   "autoload": {
