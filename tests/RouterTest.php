@@ -7,7 +7,9 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Velo\Container\Container;
 use Velo\Controllers\Controller;
+use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
+use Velo\Router\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\PathResolver;
 use Velo\Router\Router;
 use Velo\Router\Exceptions\PageNotFoundException;
@@ -61,7 +63,8 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
 
         $this->router->get('/', FakeController::class, 'index');
-        $result = $this->router->resolve('/', 'GET');
+        $request = new HttpRequest('/', 'GET');
+        $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
     }
@@ -72,7 +75,8 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
 
         $this->router->get('/users/{id}/{sth}', FakeController::class, 'actionWithParams');
-        $result = $this->router->resolve('/users/5/hehe', 'GET');
+        $request = new HttpRequest('/users/5/hehe', 'GET');
+        $result = $this->router->resolve($request);
         $this->assertInstanceOf(HttpResponse::class, $result);
     }
 
@@ -80,7 +84,17 @@ class RouterTest extends TestCase
     public function it_throws_page_not_found_exception(): void
     {
         $this->expectException(PageNotFoundException::class);
-        $this->router->resolve('/users', 'GET');
+        $request = new HttpRequest('/users', 'GET');
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_throws_controller_method_invalid_return_type_exception(): void
+    {
+        $this->expectException(ControllerMethodInvalidReturnTypeException::class);
+        $this->router->get('/', FakeController::class, 'invalidReturnType');
+        $request = new HttpRequest('/', 'GET');
+        $this->router->resolve($request);
     }
 }
 
@@ -98,5 +112,10 @@ class FakeController extends Controller
     {
         self::$wasCalled++;
         return new HttpResponse('', 1);
+    }
+
+    public function invalidReturnType(): string
+    {
+        return 'string';
     }
 }
