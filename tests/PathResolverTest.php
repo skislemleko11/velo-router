@@ -14,7 +14,6 @@ class PathResolverTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->pathResolver = new PathResolver(
             basePath: '/',
             publicPath: '/public/',
