@@ -3,9 +3,13 @@ declare(strict_types=1);
 
 namespace Velo\Router;
 
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
+use ReflectionException;
 use ReflectionMethod;
 use Velo\Http\HttpRequest;
+use Velo\Router\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Exceptions\NotFoundMethodException;
 use Velo\Router\Exceptions\PageNotFoundException;
@@ -15,65 +19,102 @@ use Velo\Router\Exceptions\ControllerMethodInvalidReturnTypeException;
 
 class Router
 {
+    /**
+     * @var array<string, array<string, Route>>
+     */
     private(set) array $routes = [];
 
-    public function __construct(private readonly ContainerInterface $container)
+    public function __construct(
+        private readonly ContainerInterface $container,
+        private readonly Pipeline $pipeline,
+    )
     {
-
     }
 
-    public function get(string $path, string $controller, string $action): void
+    public function get(string $path, string $controller, string $action): Route
     {
-        $this->routes['GET'][$path] = [$controller, $action];
+        return $this->registerRoute('GET', $path, $controller, $action);
     }
 
-    public function post(string $path, string $controller, string $action): void
+    public function post(string $path, string $controller, string $action): Route
     {
-        $this->routes['POST'][$path] = [$controller, $action];
+        return $this->registerRoute('POST', $path, $controller, $action);
     }
 
+    private function registerRoute(string $method, string $path, string $controller, string $action): Route
+    {
+        $route = new Route($method, $path, $controller, $action);
+        $this->routes[$method][$path] = $route;
+        return $route;
+    }
+
+    /**
+     * @param HttpRequest $request
+     * @return HttpResponse
+     * @throws ContainerExceptionInterface
+     * @throws ControllerMethodInvalidReturnTypeException
+     * @throws MustImplementMiddlewareInterfaceException
+     * @throws NotFoundControllerException
+     * @throws NotFoundExceptionInterface
+     * @throws NotFoundMethodException
+     * @throws PageNotFoundException
+     * @throws ReflectionException
+     */
     public function resolve(HttpRequest $request): HttpResponse
     {
         $path = parse_url($request->url, PHP_URL_PATH);
-        $handler = $this->routes[$request->method][$path] ?? null;
+        $route = $this->routes[$request->method][$path] ?? null;
 
-        if ($handler)
-            return $this->callAction($handler[0], $handler[1], $request);
+        if ($route)
+            return $this->callAction($route, $request);
 
-        foreach ($this->routes[$request->method] ?? [] as $routePath => [$controller, $action]) {
+        foreach ($this->routes[$request->method] ?? [] as $routePath => $route) {
             $pattern = '#^' . preg_replace('/\{[a-zA-Z0-9_]+}/', '([^/]+)', $routePath) . '$#';
 
             if (preg_match($pattern, $path, $matches)) {
                 // Deleting the 1st element, cuz it stores the whole path
                 array_shift($matches);
 
-                return $this->callAction($controller, $action, $request, $matches);
+                return $this->callAction($route, $request, $matches);
             }
         }
 
         throw new PageNotFoundException();
     }
 
-    private function callAction(string $controllerClass, string $action, HttpRequest $request, array $getArgs = []): HttpResponse
+    /**
+     * @param Route $route
+     * @param HttpRequest $request
+     * @param array $getArgs
+     * @return HttpResponse
+     * @throws ContainerExceptionInterface
+     * @throws ControllerMethodInvalidReturnTypeException
+     * @throws MustImplementMiddlewareInterfaceException
+     * @throws NotFoundControllerException
+     * @throws NotFoundExceptionInterface
+     * @throws NotFoundMethodException
+     * @throws ReflectionException
+     */
+    private function callAction(Route $route, HttpRequest $request, array $getArgs = []): HttpResponse
     {
-        if (!class_exists($controllerClass))
+        if (!class_exists($route->controller))
             throw new NotFoundControllerException();
 
-        if (!method_exists($controllerClass, $action))
+        if (!method_exists($route->controller, $route->action))
             throw new NotFoundMethodException();
 
-        $controllerInstance = $this->getController($controllerClass);
+        $controllerInstance = $this->getController($route->controller);
 
-        $castedArgs = $this->castMethodsArgs($controllerClass, $action, $getArgs);
+        $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getArgs);
 
-        $response = $controllerInstance->$action($request, ...$castedArgs);
+        $response = $this->pipeline->executeMiddlewareChain($route, $request, $castedArgs);
 
         if (!$response instanceof HttpResponse)
             throw new ControllerMethodInvalidReturnTypeException(
                 sprintf(
                     'Controller action %s::%s() must return an instance of Velo\Http\HttpResponse, %s returned.',
                     get_class($controllerInstance),
-                    $action,
+                    $route->action,
                     get_debug_type($response)
                 )
             );
@@ -81,11 +122,18 @@ class Router
         return $response;
     }
 
+    /**
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     private function getController(string $controllerClass): object
     {
         return $this->container->get($controllerClass);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     private function castMethodsArgs(string $className, string $methodName, array $args): array
     {
         $reflection = new ReflectionMethod($className, $methodName);
