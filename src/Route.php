@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace Velo\Router;
 
-use Velo\Http\Interfaces\MiddlewareInterface;
-
 class Route
 {
     private array $middlewares;

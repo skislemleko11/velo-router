@@ -42,7 +42,7 @@ class RouterTest extends TestCase
         $this->pipeline = new Pipeline($this->container);
         $this->container->set(Pipeline::class, fn() => $this->pipeline);
 
-        $this->router = new Router($this->container, $this->pipeline);
+        $this->router = new Router($this->pipeline);
     }
 
     #[Test]

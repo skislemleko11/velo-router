@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Velo\Router;
 
 use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use ReflectionException;
 use ReflectionMethod;
@@ -25,8 +24,7 @@ class Router
     private(set) array $routes = [];
 
     public function __construct(
-        private readonly ContainerInterface $container,
-        private readonly Pipeline $pipeline,
+        private readonly Pipeline           $pipeline,
     )
     {
     }
@@ -103,32 +101,9 @@ class Router
         if (!method_exists($route->controller, $route->action))
             throw new NotFoundMethodException();
 
-        $controllerInstance = $this->getController($route->controller);
-
         $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getArgs);
 
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, $castedArgs);
-
-        if (!$response instanceof HttpResponse)
-            throw new ControllerMethodInvalidReturnTypeException(
-                sprintf(
-                    'Controller action %s::%s() must return an instance of Velo\Http\HttpResponse, %s returned.',
-                    get_class($controllerInstance),
-                    $route->action,
-                    get_debug_type($response)
-                )
-            );
-
-        return $response;
-    }
-
-    /**
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     */
-    private function getController(string $controllerClass): object
-    {
-        return $this->container->get($controllerClass);
+        return $this->pipeline->executeMiddlewareChain($route, $request, $castedArgs);
     }
 
     /**

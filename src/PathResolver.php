@@ -30,6 +30,9 @@ class PathResolver
         $this->dirPaths[$key] = $path;
     }
 
+    /**
+     * @throws PathNotFoundException
+     */
     public function getDirPath(string $key): string
     {
         if (!isset($this->dirPaths[$key]))
@@ -43,6 +46,9 @@ class PathResolver
         $this->filePaths[$key] = $path;
     }
 
+    /**
+     * @throws PathNotFoundException
+     */
     public function getFilePath(string $key): string
     {
         if (!isset($this->filePaths[$key]))
