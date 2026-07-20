@@ -31,6 +31,7 @@ class RouterTest extends TestCase
             basePath: '/',
             publicPath: '/public/',
             viewsPath: '/views/',
+            error403Path: null,
             error404Path: '/views/error404.php',
             error500Path: '/views/error500.php',
         );
@@ -124,8 +125,8 @@ class RouterTest extends TestCase
     public function it_allows_fluent_middleware_registration_on_route(): void
     {
         $route = $this->router->get('/admin', FakeController::class, 'index')
-            ->middlewares('SomeMiddleware')
-            ->middlewares('AnotherMiddleware');
+            ->setMiddleware('SomeMiddleware')
+            ->setMiddleware('AnotherMiddleware');
 
         $this->assertSame('SomeMiddleware', $route->getMiddleware(0));
         $this->assertSame('AnotherMiddleware', $route->getMiddleware(1));
@@ -141,7 +142,7 @@ class RouterTest extends TestCase
         $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $this->router->get('/dashboard', FakeController::class, 'index')
-            ->middlewares(FakeMiddleware::class);
+            ->setMiddleware(FakeMiddleware::class);
 
         $request = new HttpRequest('/dashboard', 'GET');
         $result = $this->router->resolve($request);
@@ -160,7 +161,7 @@ class RouterTest extends TestCase
         $this->container->set(StoppingMiddleware::class, fn() => new StoppingMiddleware());
 
         $this->router->get('/protected', FakeController::class, 'index')
-            ->middlewares(StoppingMiddleware::class);
+            ->setMiddleware(StoppingMiddleware::class);
 
         $request = new HttpRequest('/protected', 'GET');
         $result = $this->router->resolve($request);

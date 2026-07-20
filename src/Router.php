@@ -24,7 +24,7 @@ class Router
     private(set) array $routes = [];
 
     public function __construct(
-        private readonly Pipeline           $pipeline,
+        private readonly Pipeline $pipeline,
     )
     {
     }
@@ -60,8 +60,7 @@ class Router
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
-        $path = parse_url($request->url, PHP_URL_PATH);
-        $route = $this->routes[$request->method][$path] ?? null;
+        $route = $this->routes[$request->method][$request->url] ?? null;
 
         if ($route)
             return $this->callAction($route, $request);
@@ -69,7 +68,7 @@ class Router
         foreach ($this->routes[$request->method] ?? [] as $routePath => $route) {
             $pattern = '#^' . preg_replace('/\{[a-zA-Z0-9_]+}/', '([^/]+)', $routePath) . '$#';
 
-            if (preg_match($pattern, $path, $matches)) {
+            if (preg_match($pattern, $request->url, $matches)) {
                 // Deleting the 1st element, cuz it stores the whole path
                 array_shift($matches);
 

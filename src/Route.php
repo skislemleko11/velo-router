@@ -27,7 +27,7 @@ class Route
         return count($this->middlewares);
     }
 
-    public function middlewares(string $middlewareClass): self
+    public function setMiddleware(string $middlewareClass): self
     {
         $this->middlewares[] = $middlewareClass;
         return $this;

@@ -14,13 +14,15 @@ class PathResolver
         string $basePath,
         string $publicPath,
         string $viewsPath,
-        string $error404Path,
-        string $error500Path,
+        ?string $error403Path,
+        ?string $error404Path,
+        ?string $error500Path,
     )
     {
         $this->dirPaths['base'] = $basePath;
         $this->dirPaths['public'] = $publicPath;
         $this->dirPaths['views'] = $viewsPath;
+        $this->filePaths['error403'] = $error403Path;
         $this->filePaths['error404'] = $error404Path;
         $this->filePaths['error500'] = $error500Path;
     }
@@ -41,7 +43,7 @@ class PathResolver
         return rtrim($this->dirPaths[$key], '/') . '/';
     }
 
-    public function setFilePath(string $key, string $path): void
+    public function setFilePath(string $key, ?string $path): void
     {
         $this->filePaths[$key] = $path;
     }
@@ -49,9 +51,9 @@ class PathResolver
     /**
      * @throws PathNotFoundException
      */
-    public function getFilePath(string $key): string
+    public function getFilePath(string $key): ?string
     {
-        if (!isset($this->filePaths[$key]))
+        if (!array_key_exists($key, $this->filePaths))
             throw new PathNotFoundException("The requested file path \"$key\" not found!");
 
         return $this->filePaths[$key];
@@ -64,6 +66,6 @@ class PathResolver
 
     public function isFileRegistered(string $path): bool
     {
-        return isset($this->filePaths[$path]);
+        return array_key_exists($path, $this->filePaths);
     }
 }

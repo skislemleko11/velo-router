@@ -26,7 +26,8 @@ readonly class Pipeline
         /**
          * @throws MustImplementMiddlewareInterfaceException
          * @throws ContainerExceptionInterface
-         * @throws NotFoundExceptionInterface|ControllerMethodInvalidReturnTypeException
+         * @throws NotFoundExceptionInterface
+         * @throws ControllerMethodInvalidReturnTypeException
          */
         $next = function (HttpRequest $request) use ($route, &$index, &$castedArgs, &$next) {
             if ($index >= $route->getMiddlewaresCount())

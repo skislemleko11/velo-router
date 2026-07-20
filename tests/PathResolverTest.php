@@ -18,6 +18,7 @@ class PathResolverTest extends TestCase
             basePath: '/',
             publicPath: '/public/',
             viewsPath: '/views/',
+            error403Path: null,
             error404Path: '/views/error404.php',
             error500Path: '/views/error500.php',
         );
@@ -27,7 +28,7 @@ class PathResolverTest extends TestCase
     public function it_has_basic_paths_registered(): void
     {
         $toCompareDirs = ['base' => 0, 'public' => 0, 'views' => 0];
-        $toCompareFiles = ['error404' => 0, 'error500' => 0];
+        $toCompareFiles = ['error403' => 0, 'error404' => 0, 'error500' => 0];
         $this->assertTrue(
             (!array_diff_key($toCompareDirs, $this->pathResolver->dirPaths) &&
                 !array_diff_key($toCompareFiles, $this->pathResolver->filePaths))
@@ -71,6 +72,20 @@ class PathResolverTest extends TestCase
     }
 
     #[Test]
+    public function it_sets_null_file_path(): void
+    {
+        $key = 'error999';
+        $this->pathResolver->setFilePath($key, null);
+        $this->assertNull($this->pathResolver->filePaths[$key]);
+    }
+
+    #[Test]
+    public function it_gets_null_file_path(): void
+    {
+        $this->assertNull($this->pathResolver->getFilePath('error403'));
+    }
+
+    #[Test]
     public function is_dir_registered(): void
     {
         $key = 'hehe';
@@ -84,6 +99,11 @@ class PathResolverTest extends TestCase
         $key = 'hehe';
         $this->pathResolver->setFilePath($key, '/views/hehe.php');
         $this->assertTrue($this->pathResolver->isFileRegistered($key));
+    }
+
+    public function is_file_with_null_path_registered(): void
+    {
+        $this->assertTrue($this->pathResolver->isFileRegistered('error403.php'));
     }
 
     #[Test]
