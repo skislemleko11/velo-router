@@ -7,7 +7,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use Velo\Router\Route;
+use Velo\Router\Route\Route;
 
 class RouteTest extends TestCase
 {
@@ -26,8 +26,27 @@ class RouteTest extends TestCase
     #[Test]
     public function it_sets_middleware_and_returns_self(): void
     {
-        $self = $this->route->setMiddleware('middleware');
-        $this->assertSame('middleware', $this->getProperty('middlewares'));
+        $self = $this->route->addMiddleware('middleware');
+        $this->assertSame([['middleware', []]], $this->getProperty('middlewares'));
+        $this->assertSame($this->route, $self);
+    }
+
+    #[Test]
+    public function it_sets_middleware_with_params_and_returns_self(): void
+    {
+        $self = $this->route->addMiddleware('middleware', 'param1', 'param2');
+        $this->assertSame([['middleware', ['param1', 'param2']]], $this->getProperty('middlewares'));
+        $this->assertSame($this->route, $self);
+    }
+
+    #[Test]
+    public function it_sets_multiple_middlewares_and_returns_self(): void
+    {
+        $self = $this->route->addMiddlewares(['middleware1', 'param1', 'param2'], ['middleware2', 'param3']);
+        $this->assertSame(
+            [['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]],
+            $this->getProperty('middlewares')
+        );
         $this->assertSame($this->route, $self);
     }
 
@@ -40,8 +59,8 @@ class RouteTest extends TestCase
     #[Test]
     public function it_gets_middleware_and_returns_value(): void
     {
-        $this->route->setMiddleware('middleware');
-        $this->assertSame('middleware', $this->getProperty('middlewares'));
+        $this->route->addMiddleware('middleware');
+        $this->assertSame([['middleware', []]], $this->getProperty('middlewares'));
     }
 
     #[Test]
@@ -49,7 +68,7 @@ class RouteTest extends TestCase
     public function it_gets_middleware_count(array $middlewares): void
     {
         foreach ($middlewares as $middleware) {
-            $this->route->setMiddleware($middleware);
+            $this->route->addMiddleware($middleware);
         }
         $this->assertSame(count($middlewares), $this->route->getMiddlewaresCount());
     }
@@ -68,6 +87,6 @@ class RouteTest extends TestCase
     {
         $reflection = new ReflectionClass(Route::class);
         $reflectionProperty = $reflection->getProperty($propertyName);
-        return $reflectionProperty->getValue($this->route)[0];
+        return $reflectionProperty->getValue($this->route);
     }
 }

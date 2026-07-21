@@ -12,10 +12,10 @@ use stdClass;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Http\Interfaces\MiddlewareInterface;
-use Velo\Router\Exceptions\ControllerMethodInvalidReturnTypeException;
-use Velo\Router\Exceptions\MustImplementMiddlewareInterfaceException;
-use Velo\Router\Pipeline;
-use Velo\Router\Route;
+use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
+use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
+use Velo\Router\Pipeline\Pipeline;
+use Velo\Router\Route\Route;
 
 class PipelineTest extends TestCase
 {
@@ -71,8 +71,8 @@ class PipelineTest extends TestCase
         $this->container->set('Middleware2', $middleware2);
 
         $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
-        $route->setMiddleware('Middleware1');
-        $route->setMiddleware('Middleware2');
+        $route->addMiddleware('Middleware1');
+        $route->addMiddleware('Middleware2');
 
         $request = new HttpRequest('/test', 'GET');
 
@@ -95,7 +95,7 @@ class PipelineTest extends TestCase
         $this->container->set(StoppingPipelineMiddleware::class, $stoppingMiddleware);
 
         $route = new Route('GET', '/admin', PipelineFakeController::class, 'successAction');
-        $route->setMiddleware(StoppingPipelineMiddleware::class);
+        $route->addMiddleware(StoppingPipelineMiddleware::class);
 
         $request = new HttpRequest('/admin', 'GET');
 
@@ -115,7 +115,7 @@ class PipelineTest extends TestCase
         $this->container->set('InvalidMiddleware', $invalidMiddleware);
 
         $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
-        $route->setMiddleware('InvalidMiddleware');
+        $route->addMiddleware('InvalidMiddleware');
 
         $request = new HttpRequest('/test', 'GET');
 
@@ -134,6 +134,22 @@ class PipelineTest extends TestCase
 
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
         $this->pipeline->executeMiddlewareChain($route, $request, []);
+    }
+
+    #[Test]
+    public function it_passes_arguments_to_middleware(): void
+    {
+        $controller = new PipelineFakeController();
+        $this->container->set(PipelineFakeController::class, $controller);
+        $this->container->set(MiddlewareWithArgs::class, new MiddlewareWithArgs());
+
+        $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
+        $route->addMiddleware(MiddlewareWithArgs::class, 'hehe', 'hihi');
+
+        $request = new HttpRequest('/test', 'GET');
+        $response = $this->pipeline->executeMiddlewareChain($route, $request, []);
+
+        $this->assertEquals(new HttpResponse(null, 200), $response);
     }
 }
 
@@ -200,6 +216,18 @@ class StepMiddleware implements MiddlewareInterface
     {
         self::$executionOrder[] = $this->name;
         return $next($request);
+    }
+}
+
+class MiddlewareWithArgs implements MiddlewareInterface
+{
+    public function handle(HttpRequest $request, callable $next, string $arg1 = '', string $arg2 = ''): HttpResponse
+    {
+        if ($arg1 === 'hehe' && $arg2 === 'hihi') {
+            return $next($request);
+        }
+
+        return new HttpResponse(null, 500);
     }
 }
 

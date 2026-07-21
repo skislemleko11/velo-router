@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router;
+namespace Velo\Router\PathResolver;
 
-use Velo\Router\Exceptions\PathNotFoundException;
+use Velo\Router\PathResolver\Exceptions\PathNotFoundException;
 
 class PathResolver
 {

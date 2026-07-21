@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router;
+namespace Velo\Router\Route;
 
 class Route
 {
@@ -17,7 +17,7 @@ class Route
         $this->middlewares = [];
     }
 
-    public function getMiddleware(int $index): ?string
+    public function getMiddleware(int $index): ?array
     {
         return $this->middlewares[$index] ?? null;
     }
@@ -27,9 +27,21 @@ class Route
         return count($this->middlewares);
     }
 
-    public function setMiddleware(string $middlewareClass): self
+    public function addMiddleware(string $middlewareClass, mixed ...$arguments): self
     {
-        $this->middlewares[] = $middlewareClass;
+        $this->middlewares[] = [$middlewareClass, $arguments];
+        return $this;
+    }
+
+    /**
+     * @param array{0: string, 1?: mixed, ...} ...$middlewares
+     */
+    public function addMiddlewares(array ...$middlewares): self
+    {
+        foreach ($middlewares as $middleware) {
+            $this->addMiddleware(...$middleware);
+        }
+
         return $this;
     }
 }

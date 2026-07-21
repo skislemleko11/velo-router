@@ -1,12 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router\Exceptions;
+namespace Velo\Router\Pipeline\Exceptions;
 
-use Exception;
 use Velo\Http\HttpResponse;
 
-class ControllerMethodInvalidReturnTypeException extends Exception
+class ControllerMethodInvalidReturnTypeException extends PipelineException
 {
     protected $message = 'Invalid return type of controller function! It must be ' . HttpResponse::class;
 }

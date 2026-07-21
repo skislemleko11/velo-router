@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace Velo\Router\Tests;
 
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Test;
-use Velo\Router\PathResolver;
-use Velo\Router\Exceptions\PathNotFoundException;
+use PHPUnit\Framework\TestCase;
+use Velo\Router\PathResolver\Exceptions\PathNotFoundException;
+use Velo\Router\PathResolver\PathResolver;
 
 class PathResolverTest extends TestCase
 {

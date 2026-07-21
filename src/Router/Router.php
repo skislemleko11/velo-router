@@ -1,19 +1,21 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router;
+namespace Velo\Router\Router;
 
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use ReflectionException;
 use ReflectionMethod;
 use Velo\Http\HttpRequest;
-use Velo\Router\Exceptions\MustImplementMiddlewareInterfaceException;
-use Velo\Router\Exceptions\NotFoundControllerException;
-use Velo\Router\Exceptions\NotFoundMethodException;
-use Velo\Router\Exceptions\PageNotFoundException;
 use Velo\Http\HttpResponse;
-use Velo\Router\Exceptions\ControllerMethodInvalidReturnTypeException;
+use Velo\Router\Exceptions\PageNotFoundException;
+use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
+use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
+use Velo\Router\Pipeline\Pipeline;
+use Velo\Router\Route\Route;
+use Velo\Router\Router\Exceptions\NotFoundControllerException;
+use Velo\Router\Router\Exceptions\NotFoundMethodException;
 
 
 class Router

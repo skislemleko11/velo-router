@@ -11,12 +11,12 @@ use Velo\Controllers\Controller;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Http\Interfaces\MiddlewareInterface;
-use Velo\Router\Exceptions\ControllerMethodInvalidReturnTypeException;
-use Velo\Router\PathResolver;
-use Velo\Router\Pipeline;
-use Velo\Router\Route;
-use Velo\Router\Router;
 use Velo\Router\Exceptions\PageNotFoundException;
+use Velo\Router\PathResolver\PathResolver;
+use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
+use Velo\Router\Pipeline\Pipeline;
+use Velo\Router\Route\Route;
+use Velo\Router\Router\Router;
 
 class RouterTest extends TestCase
 {
@@ -125,11 +125,11 @@ class RouterTest extends TestCase
     public function it_allows_fluent_middleware_registration_on_route(): void
     {
         $route = $this->router->get('/admin', FakeController::class, 'index')
-            ->setMiddleware('SomeMiddleware')
-            ->setMiddleware('AnotherMiddleware');
+            ->addMiddleware('SomeMiddleware')
+            ->addMiddleware('AnotherMiddleware');
 
-        $this->assertSame('SomeMiddleware', $route->getMiddleware(0));
-        $this->assertSame('AnotherMiddleware', $route->getMiddleware(1));
+        $this->assertSame(['SomeMiddleware', []], $route->getMiddleware(0));
+        $this->assertSame(['AnotherMiddleware', []], $route->getMiddleware(1));
     }
 
     #[Test]
@@ -142,7 +142,7 @@ class RouterTest extends TestCase
         $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $this->router->get('/dashboard', FakeController::class, 'index')
-            ->setMiddleware(FakeMiddleware::class);
+            ->addMiddleware(FakeMiddleware::class);
 
         $request = new HttpRequest('/dashboard', 'GET');
         $result = $this->router->resolve($request);
@@ -161,7 +161,7 @@ class RouterTest extends TestCase
         $this->container->set(StoppingMiddleware::class, fn() => new StoppingMiddleware());
 
         $this->router->get('/protected', FakeController::class, 'index')
-            ->setMiddleware(StoppingMiddleware::class);
+            ->addMiddleware(StoppingMiddleware::class);
 
         $request = new HttpRequest('/protected', 'GET');
         $result = $this->router->resolve($request);

@@ -1,12 +1,12 @@
 <?php
+declare(strict_types=1);
 
-namespace Velo\Router\Exceptions;
+namespace Velo\Router\Router\Exceptions;
 
-use Exception;
 use Psr\Container\NotFoundExceptionInterface;
 use Velo\Router\Exceptions\Interfaces\HttpExceptionInterface;
 
-class NotFoundControllerException extends Exception implements NotFoundExceptionInterface, HttpExceptionInterface
+class NotFoundControllerException extends RouterException implements NotFoundExceptionInterface, HttpExceptionInterface
 {
     protected $message = "The requested controller was not found.";
 

@@ -1,11 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router\Exceptions;
+namespace Velo\Router\Pipeline\Exceptions;
 
-use Exception;
-
-class MustImplementMiddlewareInterfaceException extends Exception
+class MustImplementMiddlewareInterfaceException extends PipelineException
 {
     protected $message = 'Middleware classes must implement the MiddlewareInterface!';
 }
