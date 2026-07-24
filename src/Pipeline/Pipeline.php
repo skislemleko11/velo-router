@@ -109,11 +109,12 @@ readonly class Pipeline
         $controllerInstance = $this->container->get($route->controller);
         $result = $controllerInstance->{$route->action}($request, ...$castedArgs);
 
-        if (!$result instanceof HttpResponse)
+        if (!$result instanceof HttpResponse) {
             throw new ControllerMethodInvalidReturnTypeException(
                 'Invalid return type of controller ' . $controllerInstance::class .
                 ' function! It must be ' . HttpResponse::class
             );
+        }
 
         return $result;
     }

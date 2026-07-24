@@ -11,9 +11,9 @@ class PathResolver
     protected(set) array $filePaths = [];
 
     public function __construct(
-        string $basePath,
-        string $publicPath,
-        string $viewsPath,
+        string  $basePath,
+        string  $publicPath,
+        string  $viewsPath,
         ?string $error403Path,
         ?string $error404Path,
         ?string $error500Path,
@@ -37,8 +37,9 @@ class PathResolver
      */
     public function getDirPath(string $key): string
     {
-        if (!isset($this->dirPaths[$key]))
+        if (!isset($this->dirPaths[$key])) {
             throw new PathNotFoundException("The requested dir path \"$key\" not found!");
+        }
 
         return rtrim($this->dirPaths[$key], '/') . '/';
     }
@@ -53,8 +54,9 @@ class PathResolver
      */
     public function getFilePath(string $key): ?string
     {
-        if (!array_key_exists($key, $this->filePaths))
+        if (!array_key_exists($key, $this->filePaths)) {
             throw new PathNotFoundException("The requested file path \"$key\" not found!");
+        }
 
         return $this->filePaths[$key];
     }

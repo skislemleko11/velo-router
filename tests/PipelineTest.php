@@ -209,7 +209,8 @@ class FakeContainer implements ContainerInterface
     public function get(string $id): object
     {
         if (!$this->has($id)) {
-            throw new class("Service not found: $id") extends Exception implements NotFoundExceptionInterface {};
+            throw new class("Service not found: $id") extends Exception implements NotFoundExceptionInterface {
+            };
         }
 
         return $this->services[$id];

@@ -64,8 +64,9 @@ class Router
     {
         $route = $this->routes[$request->method][$request->url] ?? null;
 
-        if ($route)
+        if ($route) {
             return $this->callAction($route, $request);
+        }
 
         foreach ($this->routes[$request->method] ?? [] as $routePath => $route) {
             $pattern = '#^' . preg_replace('/\{[a-zA-Z0-9_]+}/', '([^/]+)', $routePath) . '$#';
@@ -96,11 +97,13 @@ class Router
      */
     private function callAction(Route $route, HttpRequest $request, array $getArgs = []): HttpResponse
     {
-        if (!class_exists($route->controller))
+        if (!class_exists($route->controller)) {
             throw new NotFoundControllerException();
+        }
 
-        if (!method_exists($route->controller, $route->action))
+        if (!method_exists($route->controller, $route->action)) {
             throw new NotFoundMethodException();
+        }
 
         $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getArgs);
 
@@ -121,8 +124,9 @@ class Router
         foreach ($reflectionParams as $param) {
             $type = $param->getType();
 
-            if ($type && $type->getName() === HttpRequest::class)
+            if ($type && $type->getName() === HttpRequest::class) {
                 continue;
+            }
 
             if (isset($args[$argsIndex])) {
                 $value = $args[$argsIndex];
