@@ -5,6 +5,9 @@ namespace Velo\Router\Route;
 
 class Route
 {
+    /**
+     * @var array
+     */
     private array $middlewares;
 
     public function __construct(
@@ -22,11 +25,21 @@ class Route
         return $this->middlewares[$index] ?? null;
     }
 
+    public function getMiddlewares(): array
+    {
+        return $this->middlewares;
+    }
+
     public function getMiddlewaresCount(): int
     {
         return count($this->middlewares);
     }
 
+    /**
+     * @param class-string $middlewareClass
+     * @param mixed ...$arguments
+     * @return $this
+     */
     public function addMiddleware(string $middlewareClass, mixed ...$arguments): self
     {
         $this->middlewares[] = [$middlewareClass, $arguments];
@@ -35,6 +48,7 @@ class Route
 
     /**
      * @param array{0: string, 1?: mixed, ...} ...$middlewares
+     * @return $this
      */
     public function addMiddlewares(array ...$middlewares): self
     {

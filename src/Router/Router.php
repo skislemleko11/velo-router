@@ -104,7 +104,7 @@ class Router
 
         $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getArgs);
 
-        return $this->pipeline->executeMiddlewareChain($route, $request, $castedArgs);
+        return $this->pipeline->executeRoutesMiddlewaresChain($route, $request, $castedArgs);
     }
 
     /**

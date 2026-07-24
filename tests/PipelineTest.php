@@ -37,7 +37,7 @@ class PipelineTest extends TestCase
         $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
         $request = new HttpRequest('/test', 'GET');
 
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertInstanceOf(HttpResponse::class, $response);
         $this->assertSame(200, $response->statusCode);
@@ -53,7 +53,7 @@ class PipelineTest extends TestCase
         $route = new Route('GET', '/users/{id}', PipelineFakeController::class, 'actionWithArgs');
         $request = new HttpRequest('/users/42', 'GET');
 
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, [42, 'john']);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [42, 'john']);
 
         $this->assertSame(200, $response->statusCode);
         $this->assertSame([42, 'john'], $controller->lastArgs);
@@ -78,7 +78,7 @@ class PipelineTest extends TestCase
 
         StepMiddleware::$executionOrder = [];
 
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertSame(200, $response->statusCode);
         $this->assertSame(['first', 'second'], StepMiddleware::$executionOrder);
@@ -99,10 +99,52 @@ class PipelineTest extends TestCase
 
         $request = new HttpRequest('/admin', 'GET');
 
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertSame(403, $response->statusCode);
         $this->assertSame(0, $controller->wasCalled);
+    }
+
+    #[Test]
+    public function it_supports_direct_middleware_instances(): void
+    {
+        $controller = new PipelineFakeController();
+        $this->container->set(PipelineFakeController::class, $controller);
+
+        $directMiddleware = new StepMiddleware('direct');
+
+        $request = new HttpRequest('/test', 'GET');
+        StepMiddleware::$executionOrder = [];
+
+        $response = $this->pipeline->executeMiddlewaresChain(
+            $request,
+            [$directMiddleware],
+            fn(HttpRequest $req) => $controller->successAction($req)
+        );
+
+        $this->assertSame(200, $response->statusCode);
+        $this->assertSame(['direct'], StepMiddleware::$executionOrder);
+        $this->assertSame(1, $controller->wasCalled);
+    }
+
+    #[Test]
+    public function it_passes_modified_request_down_the_middleware_chain_to_controller(): void
+    {
+        $controller = new PipelineFakeController();
+        $this->container->set(PipelineFakeController::class, $controller);
+
+        $modifyingMiddleware = new ModifyingRequestMiddleware();
+        $route = new Route('GET', '/test', PipelineFakeController::class, 'actionCapturingRequest');
+        $route->addMiddleware(ModifyingRequestMiddleware::class);
+
+        $this->container->set(ModifyingRequestMiddleware::class, $modifyingMiddleware);
+
+        $request = new HttpRequest('/original-path', 'GET');
+
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
+
+        $this->assertSame(200, $response->statusCode);
+        $this->assertSame('/modified-path', $controller->lastReceivedRequest?->url);
     }
 
     #[Test]
@@ -120,7 +162,7 @@ class PipelineTest extends TestCase
         $request = new HttpRequest('/test', 'GET');
 
         $this->expectException(MustImplementMiddlewareInterfaceException::class);
-        $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
     }
 
     #[Test]
@@ -133,7 +175,7 @@ class PipelineTest extends TestCase
         $request = new HttpRequest('/test', 'GET');
 
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
-        $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
     }
 
     #[Test]
@@ -147,7 +189,7 @@ class PipelineTest extends TestCase
         $route->addMiddleware(MiddlewareWithArgs::class, 'hehe', 'hihi');
 
         $request = new HttpRequest('/test', 'GET');
-        $response = $this->pipeline->executeMiddlewareChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertEquals(new HttpResponse(null, 200), $response);
     }
@@ -184,10 +226,12 @@ class PipelineFakeController
 {
     public int $wasCalled = 0;
     public array $lastArgs = [];
+    public ?HttpRequest $lastReceivedRequest = null;
 
     public function successAction(HttpRequest $request): HttpResponse
     {
         $this->wasCalled++;
+        $this->lastReceivedRequest = $request;
         return new HttpResponse(null, 200);
     }
 
@@ -195,6 +239,14 @@ class PipelineFakeController
     {
         $this->wasCalled++;
         $this->lastArgs = [$id, $name];
+        $this->lastReceivedRequest = $request;
+        return new HttpResponse(null, 200);
+    }
+
+    public function actionCapturingRequest(HttpRequest $request): HttpResponse
+    {
+        $this->wasCalled++;
+        $this->lastReceivedRequest = $request;
         return new HttpResponse(null, 200);
     }
 
@@ -216,6 +268,15 @@ class StepMiddleware implements MiddlewareInterface
     {
         self::$executionOrder[] = $this->name;
         return $next($request);
+    }
+}
+
+class ModifyingRequestMiddleware implements MiddlewareInterface
+{
+    public function handle(HttpRequest $request, callable $next): HttpResponse
+    {
+        $modifiedRequest = new HttpRequest('/modified-path', $request->method);
+        return $next($modifiedRequest);
     }
 }
 
