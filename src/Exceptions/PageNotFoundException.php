@@ -6,6 +6,9 @@ namespace Velo\Router\Exceptions;
 use Exception;
 use Velo\Router\Exceptions\Interfaces\HttpExceptionInterface;
 
+/**
+ * This Exception should be called to trigger a 404 Page Not Found error.
+ */
 class PageNotFoundException extends Exception implements HttpExceptionInterface
 {
     protected $message = 'Page not found!';

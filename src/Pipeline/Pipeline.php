@@ -8,7 +8,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
-use Velo\Http\Interfaces\MiddlewareInterface;
+use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
@@ -21,12 +21,9 @@ readonly class Pipeline
     }
 
     /**
-     * Main, universal method running the given chain of middlewares.
-     * Used for the global pipeline.
-     * @param HttpRequest $request
-     * @param array<MiddlewareInterface|array{0: string, 1?: mixed, ...}|string> $middlewares
-     * @param callable $destination
-     * @return HttpResponse
+     * Main, universal method running the given chain of middlewares. Used for the global pipeline.
+     *
+     * @param list<MiddlewareInterface|class-string|array{0: class-string, 1?: list<mixed>}|callable> $middlewares
      * @throws ContainerExceptionInterface
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundExceptionInterface
@@ -60,6 +57,8 @@ readonly class Pipeline
                 $middlewareInstance = $this->container->get($middlewareClass);
             } elseif (is_string($middleware)) {
                 $middlewareInstance = $this->container->get($middleware);
+            } elseif (is_callable($middleware)) {
+                $middlewareInstance = $middleware();
             } else {
                 throw new MustImplementMiddlewareInterfaceException(
                     "Middleware must implement " . MiddlewareInterface::class

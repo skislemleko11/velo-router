@@ -11,7 +11,7 @@ use Psr\Container\NotFoundExceptionInterface;
 use stdClass;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
-use Velo\Http\Interfaces\MiddlewareInterface;
+use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
@@ -186,12 +186,32 @@ class PipelineTest extends TestCase
         $this->container->set(MiddlewareWithArgs::class, new MiddlewareWithArgs());
 
         $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
-        $route->addMiddleware(MiddlewareWithArgs::class, 'hehe', 'hihi');
+        $route->addMiddleware([MiddlewareWithArgs::class, ['hehe', 'hihi']]);
 
         $request = new HttpRequest('/test', 'GET');
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertEquals(new HttpResponse(null, 200), $response);
+    }
+
+    #[Test]
+    public function it_supports_callable_factories_returning_middleware(): void
+    {
+        $controller = new PipelineFakeController();
+        $this->container->set(PipelineFakeController::class, $controller);
+
+        $factory = fn() => new StepMiddleware('from_factory');
+
+        StepMiddleware::$executionOrder = [];
+
+        $response = $this->pipeline->executeMiddlewaresChain(
+            new HttpRequest('/test', 'GET'),
+            [$factory],
+            fn(HttpRequest $req) => $controller->successAction($req)
+        );
+
+        $this->assertSame(200, $response->statusCode);
+        $this->assertSame(['from_factory'], StepMiddleware::$executionOrder);
     }
 }
 

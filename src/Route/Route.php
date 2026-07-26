@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace Velo\Router\Route;
 
+use Velo\Router\Middlewares\AddMiddlewaresTrait;
+use Velo\Router\Middlewares\MiddlewareInterface;
+
 class Route
 {
-    /**
-     * @var array
-     */
-    private array $middlewares;
+    use AddMiddlewaresTrait;
 
     public function __construct(
         public readonly string $requestMethod,
@@ -17,10 +17,9 @@ class Route
         public readonly string $action,
     )
     {
-        $this->middlewares = [];
     }
 
-    public function getMiddleware(int $index): ?array
+    public function getMiddleware(int $index): MiddlewareInterface|string|array|callable|null
     {
         return $this->middlewares[$index] ?? null;
     }
@@ -33,29 +32,5 @@ class Route
     public function getMiddlewaresCount(): int
     {
         return count($this->middlewares);
-    }
-
-    /**
-     * @param class-string $middlewareClass
-     * @param mixed ...$arguments
-     * @return $this
-     */
-    public function addMiddleware(string $middlewareClass, mixed ...$arguments): self
-    {
-        $this->middlewares[] = [$middlewareClass, $arguments];
-        return $this;
-    }
-
-    /**
-     * @param array{0: string, 1?: mixed, ...} ...$middlewares
-     * @return $this
-     */
-    public function addMiddlewares(array ...$middlewares): self
-    {
-        foreach ($middlewares as $middleware) {
-            $this->addMiddleware(...$middleware);
-        }
-
-        return $this;
     }
 }

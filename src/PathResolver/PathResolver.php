@@ -7,8 +7,8 @@ use Velo\Router\PathResolver\Exceptions\PathNotFoundException;
 
 class PathResolver
 {
-    protected(set) array $dirPaths = [];
-    protected(set) array $filePaths = [];
+    private array $dirPaths = [];
+    private array $filePaths = [];
 
     public function __construct(
         string  $basePath,

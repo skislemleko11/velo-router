@@ -27,14 +27,14 @@ class RouteTest extends TestCase
     public function it_sets_middleware_and_returns_self(): void
     {
         $self = $this->route->addMiddleware('middleware');
-        $this->assertSame([['middleware', []]], $this->getProperty('middlewares'));
+        $this->assertSame(['middleware'], $this->getProperty('middlewares'));
         $this->assertSame($this->route, $self);
     }
 
     #[Test]
     public function it_sets_middleware_with_params_and_returns_self(): void
     {
-        $self = $this->route->addMiddleware('middleware', 'param1', 'param2');
+        $self = $this->route->addMiddleware(['middleware', ['param1', 'param2']]);
         $this->assertSame([['middleware', ['param1', 'param2']]], $this->getProperty('middlewares'));
         $this->assertSame($this->route, $self);
     }
@@ -42,7 +42,7 @@ class RouteTest extends TestCase
     #[Test]
     public function it_sets_multiple_middlewares_and_returns_self(): void
     {
-        $self = $this->route->addMiddlewares(['middleware1', 'param1', 'param2'], ['middleware2', 'param3']);
+        $self = $this->route->addMiddlewares(['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]);
         $this->assertSame(
             [['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]],
             $this->getProperty('middlewares')
@@ -60,7 +60,7 @@ class RouteTest extends TestCase
     public function it_gets_middleware_and_returns_value(): void
     {
         $this->route->addMiddleware('middleware');
-        $this->assertSame([['middleware', []]], $this->getProperty('middlewares'));
+        $this->assertSame('middleware', $this->route->getMiddleware(0));
     }
 
     #[Test]

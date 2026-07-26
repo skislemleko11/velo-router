@@ -5,6 +5,7 @@ namespace Velo\Router\Tests;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Velo\Router\PathResolver\Exceptions\PathNotFoundException;
 use Velo\Router\PathResolver\PathResolver;
 
@@ -24,14 +25,21 @@ class PathResolverTest extends TestCase
         );
     }
 
+    private function getProperty(object $object, string $property): mixed
+    {
+        $reflection = new ReflectionClass($object);
+        return $reflection->getProperty($property)
+            ->getValue($object);
+    }
+
     #[Test]
     public function it_has_basic_paths_registered(): void
     {
         $toCompareDirs = ['base' => 0, 'public' => 0, 'views' => 0];
         $toCompareFiles = ['error403' => 0, 'error404' => 0, 'error500' => 0];
         $this->assertTrue(
-            (!array_diff_key($toCompareDirs, $this->pathResolver->dirPaths) &&
-                !array_diff_key($toCompareFiles, $this->pathResolver->filePaths))
+            (!array_diff_key($toCompareDirs, $this->getProperty($this->pathResolver, 'dirPaths')) &&
+                !array_diff_key($toCompareFiles, $this->getProperty($this->pathResolver, 'filePaths')))
         );
     }
 
@@ -42,8 +50,8 @@ class PathResolverTest extends TestCase
         $path = '/hehe/';
         $this->pathResolver->setDirPath($key, $path);
         $this->assertTrue(
-            isset($this->pathResolver->dirPaths[$key]) &&
-            $this->pathResolver->dirPaths[$key] == $path
+            isset($this->getProperty($this->pathResolver, 'dirPaths')[$key]) &&
+            $this->getProperty($this->pathResolver, 'dirPaths')[$key] == $path
         );
     }
 
@@ -54,8 +62,8 @@ class PathResolverTest extends TestCase
         $path = '/views/hehe.php';
         $this->pathResolver->setFilePath($key, $path);
         $this->assertTrue(
-            isset($this->pathResolver->filePaths[$key]) &&
-            $this->pathResolver->filePaths[$key] == $path
+            isset($this->getProperty($this->pathResolver, 'filePaths')[$key]) &&
+            $this->getProperty($this->pathResolver, 'filePaths')[$key] == $path
         );
     }
 
@@ -76,7 +84,7 @@ class PathResolverTest extends TestCase
     {
         $key = 'error999';
         $this->pathResolver->setFilePath($key, null);
-        $this->assertNull($this->pathResolver->filePaths[$key]);
+        $this->assertNull($this->getProperty($this->pathResolver, 'filePaths')[$key]);
     }
 
     #[Test]

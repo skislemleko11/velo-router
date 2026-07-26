@@ -10,8 +10,8 @@ use Velo\Container\Container;
 use Velo\Controllers\Controller;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
-use Velo\Http\Interfaces\MiddlewareInterface;
 use Velo\Router\Exceptions\PageNotFoundException;
+use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\PathResolver\PathResolver;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Pipeline;
@@ -128,8 +128,8 @@ class RouterTest extends TestCase
             ->addMiddleware('SomeMiddleware')
             ->addMiddleware('AnotherMiddleware');
 
-        $this->assertSame(['SomeMiddleware', []], $route->getMiddleware(0));
-        $this->assertSame(['AnotherMiddleware', []], $route->getMiddleware(1));
+        $this->assertSame('SomeMiddleware', $route->getMiddleware(0));
+        $this->assertSame('AnotherMiddleware', $route->getMiddleware(1));
     }
 
     #[Test]
