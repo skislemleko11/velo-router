@@ -14,6 +14,9 @@ use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Route\Route;
 
+/**
+ * Excecutes middlewares chains.
+ */
 readonly class Pipeline
 {
     public function __construct(private ContainerInterface $container)
@@ -23,7 +26,7 @@ readonly class Pipeline
     /**
      * Main, universal method running the given chain of middlewares. Used for the global pipeline.
      *
-     * @param list<MiddlewareInterface|class-string|array{0: class-string, 1?: list<mixed>}|callable> $middlewares
+     * @param list<MiddlewareInterface|string|array{0: string, 1?: list<mixed>}|callable> $middlewares
      * @throws ContainerExceptionInterface
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundExceptionInterface
@@ -78,8 +81,8 @@ readonly class Pipeline
     }
 
     /**
-     * Method dedicated for Routes' middlewares
-     * It uses the main method
+     * Method dedicated for Routes' middlewares. It uses the main method.
+     *
      * @param Route $route
      * @param HttpRequest $request
      * @param array $castedArgs
@@ -99,6 +102,8 @@ readonly class Pipeline
     }
 
     /**
+     * It exectutes the core action of the given route's controller.
+     *
      * @throws ContainerExceptionInterface
      * @throws NotFoundExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException

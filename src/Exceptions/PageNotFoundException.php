@@ -7,7 +7,7 @@ use Exception;
 use Velo\Router\Exceptions\Interfaces\HttpExceptionInterface;
 
 /**
- * This Exception should be called to trigger a 404 Page Not Found error.
+ * This Exception should be thrown to trigger a 404 Page Not Found error.
  */
 class PageNotFoundException extends Exception implements HttpExceptionInterface
 {

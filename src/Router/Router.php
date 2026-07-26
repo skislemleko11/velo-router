@@ -11,19 +11,22 @@ use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Router\Exceptions\PageNotFoundException;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
+use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundMethodException;
 
-
+/**
+ * Router class, it registers Routes and resolves HttpRequests.
+ */
 class Router
 {
     /**
      * @var array<string, array<string, Route>>
      */
-    private(set) array $routes = [];
+    private array $routes = [];
 
     public function __construct(
         private readonly Pipeline $pipeline,
@@ -31,16 +34,25 @@ class Router
     {
     }
 
+    /**
+     * Registers Route with GET method.
+     */
     public function get(string $path, string $controller, string $action): Route
     {
         return $this->registerRoute('GET', $path, $controller, $action);
     }
 
+    /**
+     * Registers Route with POST method.
+     */
     public function post(string $path, string $controller, string $action): Route
     {
         return $this->registerRoute('POST', $path, $controller, $action);
     }
 
+    /**
+     * Registers a Route with the given method.
+     */
     private function registerRoute(string $method, string $path, string $controller, string $action): Route
     {
         $route = new Route($method, $path, $controller, $action);
@@ -49,8 +61,8 @@ class Router
     }
 
     /**
-     * @param HttpRequest $request
-     * @return HttpResponse
+     * Resolves the given HttpReqest and calls callAction method to the appropriate controller method.
+     *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      * @throws MustImplementMiddlewareInterfaceException
@@ -59,6 +71,7 @@ class Router
      * @throws NotFoundMethodException
      * @throws PageNotFoundException
      * @throws ReflectionException
+     * @throws MiddlewareNotFoundException
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
@@ -83,10 +96,8 @@ class Router
     }
 
     /**
-     * @param Route $route
-     * @param HttpRequest $request
-     * @param array $getArgs
-     * @return HttpResponse
+     * Calls the action method of the appropriate controller for the given Route.
+     *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      * @throws MustImplementMiddlewareInterfaceException
@@ -94,8 +105,9 @@ class Router
      * @throws NotFoundExceptionInterface
      * @throws NotFoundMethodException
      * @throws ReflectionException
+     * @throws MiddlewareNotFoundException
      */
-    private function callAction(Route $route, HttpRequest $request, array $getArgs = []): HttpResponse
+    private function callAction(Route $route, HttpRequest $request, array $getMethodArgs = []): HttpResponse
     {
         if (!class_exists($route->controller)) {
             throw new NotFoundControllerException();
@@ -105,12 +117,14 @@ class Router
             throw new NotFoundMethodException();
         }
 
-        $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getArgs);
+        $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getMethodArgs);
 
         return $this->pipeline->executeRoutesMiddlewaresChain($route, $request, $castedArgs);
     }
 
     /**
+     * Casts the given arguments for the given controller class name and method name.
+     *
      * @throws ReflectionException
      */
     private function castMethodsArgs(string $className, string $methodName, array $args): array

@@ -17,6 +17,7 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
 use Velo\Router\Router\Router;
+use ReflectionClass;
 
 class RouterTest extends TestCase
 {
@@ -46,6 +47,13 @@ class RouterTest extends TestCase
         $this->router = new Router($this->pipeline);
     }
 
+    private function getProperty(object $object, string $property): mixed
+    {
+        $reflection = new ReflectionClass($object);
+        return $reflection->getProperty($property)
+            ->getValue($object);
+    }
+
     #[Test]
     public function it_registers_a_get_route(): void
     {
@@ -57,7 +65,7 @@ class RouterTest extends TestCase
         $this->assertSame('UserController', $route->controller);
         $this->assertSame('index', $route->action);
 
-        $this->assertSame($route, $this->router->routes['GET']['/users']);
+        $this->assertSame($route, $this->getProperty($this->router, 'routes')['GET']['/users']);
     }
 
     #[Test]
@@ -67,7 +75,7 @@ class RouterTest extends TestCase
 
         $this->assertInstanceOf(Route::class, $route);
         $this->assertSame('POST', $route->requestMethod);
-        $this->assertSame($route, $this->router->routes['POST']['/users']);
+        $this->assertSame($route, $this->getProperty($this->router, 'routes')['POST']['/users']);
     }
 
     #[Test]
