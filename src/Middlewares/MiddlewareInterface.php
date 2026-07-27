@@ -17,7 +17,7 @@ interface MiddlewareInterface
      * Classes implementing MiddlewareInterface can add optional parameters to method's declaration
      * for more complicated logic.
      *
-     * @param callable $next Should take HttpRequest and additional params if needed.
+     * @param callable $next Should take HttpRequest.
      */
     public function handle(HttpRequest $request, callable $next): HttpResponse;
 }
