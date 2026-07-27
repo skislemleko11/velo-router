@@ -83,10 +83,6 @@ readonly class Pipeline
     /**
      * Method dedicated for Routes' middlewares. It uses the main method.
      *
-     * @param Route $route
-     * @param HttpRequest $request
-     * @param array $castedArgs
-     * @return HttpResponse
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      * @throws MiddlewareNotFoundException

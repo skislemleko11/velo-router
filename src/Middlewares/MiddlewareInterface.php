@@ -12,7 +12,12 @@ use Velo\Http\HttpResponse;
 interface MiddlewareInterface
 {
     /**
-     * @param callable $next should take HttpRequest
+     * Handles the given HttpRequset.
+     *
+     * Classes implementing MiddlewareInterface can add optional parameters to method's declaration
+     * for more complicated logic.
+     *
+     * @param callable $next Should take HttpRequest and additional params if needed.
      */
     public function handle(HttpRequest $request, callable $next): HttpResponse;
 }
