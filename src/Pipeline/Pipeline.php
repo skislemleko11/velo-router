@@ -15,7 +15,7 @@ use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Route\Route;
 
 /**
- * Excecutes middlewares chains.
+ * Executes middleware chains.
  */
 readonly class Pipeline
 {
@@ -98,7 +98,7 @@ readonly class Pipeline
     }
 
     /**
-     * It exectutes the core action of the given route's controller.
+     * It executes the core action of the given route's controller.
      *
      * @throws ContainerExceptionInterface
      * @throws NotFoundExceptionInterface
