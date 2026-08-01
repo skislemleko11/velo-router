@@ -17,6 +17,7 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
 use Velo\Router\Router\Router;
+use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use ReflectionClass;
 
 class RouterTest extends TestCase
@@ -93,6 +94,26 @@ class RouterTest extends TestCase
     }
 
     #[Test]
+    public function it_prefers_exact_routes_over_parameterized_routes(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$indexCalls = 0;
+        FakeController::$paramsCalls = 0;
+
+        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+
+        $this->router->get('/users/me', FakeController::class, 'index');
+        $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
+
+        $request = new HttpRequest('/users/me', 'GET');
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$indexCalls);
+        $this->assertSame(0, FakeController::$paramsCalls);
+    }
+
+    #[Test]
     public function it_resolves_a_route_with_parameters_and_casts_them(): void
     {
         FakeController::$wasCalled = 0;
@@ -108,6 +129,52 @@ class RouterTest extends TestCase
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(5, FakeController::$lastArgs['id']);
         $this->assertSame(100, FakeController::$lastArgs['sth']);
+    }
+
+    #[Test]
+    public function it_casts_nullable_and_builtin_parameters(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$lastArgs = [];
+        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+
+        $this->router->get('/flags/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
+
+        $request = new HttpRequest('/flags/1/2.5', 'GET');
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$wasCalled);
+        $this->assertSame(['label' => null, 'active' => true, 'ratio' => 2.5], FakeController::$lastArgs);
+    }
+
+    #[Test]
+    public function it_uses_default_values_for_missing_arguments(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$lastArgs = [];
+        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+
+        $this->router->get('/reports/{id}', FakeController::class, 'actionWithDefaultValue');
+
+        $request = new HttpRequest('/reports/7', 'GET');
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$wasCalled);
+        $this->assertSame(['id' => 7, 'type' => 'default'], FakeController::$lastArgs);
+    }
+
+    #[Test]
+    public function it_throws_missing_required_argument_exception_when_route_is_incomplete(): void
+    {
+        $this->expectException(MissingRequiredArgumentException::class);
+        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+
+        $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
+        $request = new HttpRequest('/users/5', 'GET');
+
+        $this->router->resolve($request);
     }
 
     #[Test]
@@ -178,23 +245,87 @@ class RouterTest extends TestCase
         $this->assertSame(403, $result->statusCode);
         $this->assertSame(0, FakeController::$wasCalled);
     }
+
+    #[Test]
+    public function it_returns_false_when_loading_a_missing_cache_file(): void
+    {
+        $missingFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'velo-router-missing-' . uniqid('', true) . '.php';
+
+        $this->assertFalse($this->router->loadFromCache($missingFile));
+    }
+
+    #[Test]
+    public function it_caches_routes_and_restores_them_from_a_file(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$lastArgs = [];
+        FakeMiddleware::$wasCalled = 0;
+
+        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
+
+        $this->router->get('/cached/{id}', FakeController::class, 'actionWithDefaultValue')
+            ->addMiddleware(FakeMiddleware::class);
+
+        $cacheFile = tempnam(sys_get_temp_dir(), 'velo-router-');
+        self::assertNotFalse($cacheFile);
+
+        try {
+            $this->router->cacheRoutes($cacheFile);
+
+            $this->assertFileExists($cacheFile);
+            $this->assertStringContainsString('FakeController', (string) file_get_contents($cacheFile));
+            $this->assertStringContainsString('FakeMiddleware', (string) file_get_contents($cacheFile));
+
+            $cachedRouter = new Router($this->pipeline);
+            $this->assertTrue($cachedRouter->loadFromCache($cacheFile));
+
+            $request = new HttpRequest('/cached/42', 'GET');
+            $result = $cachedRouter->resolve($request);
+
+            $this->assertInstanceOf(HttpResponse::class, $result);
+            $this->assertSame(1, FakeMiddleware::$wasCalled);
+            $this->assertSame(1, FakeController::$wasCalled);
+            $this->assertSame(['id' => 42, 'type' => 'default'], FakeController::$lastArgs);
+        } finally {
+            @unlink($cacheFile);
+        }
+    }
 }
 
 class FakeController extends Controller
 {
     public static int $wasCalled = 0;
+    public static int $indexCalls = 0;
+    public static int $paramsCalls = 0;
     public static array $lastArgs = [];
 
     public function index(HttpRequest $request): HttpResponse
     {
         self::$wasCalled++;
+        self::$indexCalls++;
         return new HttpResponse(null, 200);
     }
 
     public function actionWithParams(HttpRequest $request, int $id, int $sth): HttpResponse
     {
         self::$wasCalled++;
+        self::$paramsCalls++;
         self::$lastArgs = ['id' => $id, 'sth' => $sth];
+        return new HttpResponse(null, 200);
+    }
+
+    public function actionWithDefaultValue(HttpRequest $request, int $id, string $type = 'default'): HttpResponse
+    {
+        self::$wasCalled++;
+        self::$lastArgs = ['id' => $id, 'type' => $type];
+        return new HttpResponse(null, 200);
+    }
+
+    public function actionWithNullableAndTyped(HttpRequest $request, ?string $label, bool $active, float $ratio): HttpResponse
+    {
+        self::$wasCalled++;
+        self::$lastArgs = ['label' => $label, 'active' => $active, 'ratio' => $ratio];
         return new HttpResponse(null, 200);
     }
 

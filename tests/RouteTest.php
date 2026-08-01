@@ -32,6 +32,20 @@ class RouteTest extends TestCase
     }
 
     #[Test]
+    public function it_keeps_a_custom_compiled_regex_passed_to_constructor(): void
+    {
+        $route = new Route(
+            'GET',
+            '/users/{id}',
+            'controller',
+            'action',
+            '#^/custom/(?P<id>\d+)$#'
+        );
+
+        $this->assertSame('#^/custom/(?P<id>\d+)$#', $route->compiledRegex);
+    }
+
+    #[Test]
     public function it_sets_middleware_with_params_and_returns_self(): void
     {
         $self = $this->route->addMiddleware(['middleware', ['param1', 'param2']]);
@@ -71,6 +85,32 @@ class RouteTest extends TestCase
             $this->route->addMiddleware($middleware);
         }
         $this->assertSame(count($middlewares), $this->route->getMiddlewaresCount());
+    }
+
+    #[Test]
+    public function it_exports_and_restores_state_using_set_state(): void
+    {
+        $route = new Route(
+            'POST',
+            '/articles/{slug}',
+            'ArticleController',
+            'show',
+            '#^/articles/(?P<slug>[a-z0-9-]+)$#'
+        );
+        $route->addMiddlewares('auth', ['rate-limit', ['60']]);
+
+        /** @var Route $restoredRoute */
+        $restoredRoute = eval('return ' . var_export($route, true) . ';');
+
+        $this->assertInstanceOf(Route::class, $restoredRoute);
+        $this->assertSame('POST', $restoredRoute->requestMethod);
+        $this->assertSame('/articles/{slug}', $restoredRoute->path);
+        $this->assertSame('ArticleController', $restoredRoute->controller);
+        $this->assertSame('show', $restoredRoute->action);
+        $this->assertSame('#^/articles/(?P<slug>[a-z0-9-]+)$#', $restoredRoute->compiledRegex);
+        $this->assertSame('auth', $restoredRoute->getMiddleware(0));
+        $this->assertSame(['rate-limit', ['60']], $restoredRoute->getMiddleware(1));
+        $this->assertSame(2, $restoredRoute->getMiddlewaresCount());
     }
 
     public static function middlewaresCountDataProvider(): array

@@ -15,6 +15,7 @@ use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
+use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundMethodException;
 
@@ -57,6 +58,7 @@ class Router
     {
         $route = new Route($method, $path, $controller, $action);
         $this->routes[$method][$path] = $route;
+
         return $route;
     }
 
@@ -72,6 +74,7 @@ class Router
      * @throws PageNotFoundException
      * @throws ReflectionException
      * @throws MiddlewareNotFoundException
+     * @throws MissingRequiredArgumentException
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
@@ -81,14 +84,11 @@ class Router
             return $this->callAction($route, $request);
         }
 
-        foreach ($this->routes[$request->method] ?? [] as $routePath => $route) {
-            $pattern = '#^' . preg_replace('/\{[a-zA-Z0-9_]+}/', '([^/]+)', $routePath) . '$#';
+        foreach ($this->routes[$request->method] ?? [] as $route) {
+            if (preg_match($route->compiledRegex, $request->url, $matches)) {
+                $namedArgs = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
-            if (preg_match($pattern, $request->url, $matches)) {
-                // Deleting the 1st element, cuz it stores the whole path
-                array_shift($matches);
-
-                return $this->callAction($route, $request, $matches);
+                return $this->callAction($route, $request, $namedArgs);
             }
         }
 
@@ -106,6 +106,7 @@ class Router
      * @throws NotFoundMethodException
      * @throws ReflectionException
      * @throws MiddlewareNotFoundException
+     * @throws MissingRequiredArgumentException
      */
     private function callAction(Route $route, HttpRequest $request, array $getMethodArgs = []): HttpResponse
     {
@@ -126,6 +127,7 @@ class Router
      * Casts the given arguments for the given controller class name and method name.
      *
      * @throws ReflectionException
+     * @throws MissingRequiredArgumentException
      */
     private function castMethodsArgs(string $className, string $methodName, array $args): array
     {
@@ -133,29 +135,54 @@ class Router
         $reflectionParams = $reflection->getParameters();
 
         $castedArgs = [];
-        $argsIndex = 0;
 
         foreach ($reflectionParams as $param) {
-            $type = $param->getType();
+            $paramType = $param->getType();
+            $paramName = $param->getName();
 
-            if ($type && $type->getName() === HttpRequest::class) {
+            if ($paramType && $paramType->getName() === HttpRequest::class) {
                 continue;
             }
 
-            if (isset($args[$argsIndex])) {
-                $value = $args[$argsIndex];
+            if (isset($args[$paramName])) {
+                $value = $args[$paramName];
 
-                if ($type && $type->isBuiltin()) {
-                    $typeName = $type->getName();
-
+                if ($paramType && $paramType->isBuiltin()) {
+                    $typeName = $paramType->getName();
                     settype($value, $typeName);
                 }
 
                 $castedArgs[] = $value;
-                $argsIndex++;
+            } elseif ($param->isDefaultValueAvailable()) {
+                $castedArgs[] = $param->getDefaultValue();
+            } elseif ($paramType->allowsNull()) {
+                $castedArgs[] = null;
+            } else {
+                throw new MissingRequiredArgumentException(
+                  "Missing required argument $paramName for method $className::$methodName()"
+                );
             }
         }
 
         return $castedArgs;
+    }
+
+    public function cacheRoutes(string $filePath): void
+    {
+        $content = '<?php' . PHP_EOL . '// This was generated automatically. Do not edit it!' . PHP_EOL .
+            'return ' . var_export($this->routes, true) . ';';
+
+        file_put_contents($filePath, $content);
+    }
+
+    public function loadFromCache(string $filePath): bool
+    {
+        if (!file_exists($filePath)) {
+            return false;
+        }
+
+        $this->routes = require $filePath;
+
+        return true;
     }
 }
