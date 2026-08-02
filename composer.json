@@ -1,6 +1,6 @@
 {
   "name": "skislemleko11/velo-router",
-  "description": "Router component for Velo framework",
+  "description": "Router package for Velo framework",
   "type": "library",
   "license": "LGPL-3.0",
   "minimum-stability": "dev",
