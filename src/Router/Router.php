@@ -6,7 +6,10 @@ namespace Velo\Router\Router;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use ReflectionException;
+use ReflectionIntersectionType;
 use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionUnionType;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Router\Exceptions\PageNotFoundException;
@@ -15,9 +18,15 @@ use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\InvalidParameterException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
 use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundMethodException;
+use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
+use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
 
 /**
  * Router class, it registers Routes and resolves HttpRequests.
@@ -63,18 +72,21 @@ class Router
     }
 
     /**
-     * Resolves the given HttpReqest and calls callAction method to the appropriate controller method.
+     * Resolves the given HttpRequest and calls callAction method to the appropriate controller method.
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
+     * @throws InvalidParameterException
+     * @throws MiddlewareNotFoundException
+     * @throws MissingRequiredArgumentException
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundControllerException
      * @throws NotFoundExceptionInterface
      * @throws NotFoundMethodException
      * @throws PageNotFoundException
+     * @throws ParameterMissingTypeDeclarationException
+     * @throws ParameterUnionTypeException
      * @throws ReflectionException
-     * @throws MiddlewareNotFoundException
-     * @throws MissingRequiredArgumentException
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
@@ -100,13 +112,16 @@ class Router
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
+     * @throws InvalidParameterException
+     * @throws MiddlewareNotFoundException
+     * @throws MissingRequiredArgumentException
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundControllerException
      * @throws NotFoundExceptionInterface
      * @throws NotFoundMethodException
+     * @throws ParameterMissingTypeDeclarationException
+     * @throws ParameterUnionTypeException
      * @throws ReflectionException
-     * @throws MiddlewareNotFoundException
-     * @throws MissingRequiredArgumentException
      */
     private function callAction(Route $route, HttpRequest $request, array $getMethodArgs = []): HttpResponse
     {
@@ -128,6 +143,10 @@ class Router
      *
      * @throws ReflectionException
      * @throws MissingRequiredArgumentException
+     * @throws ParameterMissingTypeDeclarationException
+     * @throws ParameterUnionTypeException
+     * @throws ParameterIntersectionTypeException
+     * @throws InvalidParameterException
      */
     private function castMethodsArgs(string $className, string $methodName, array $args): array
     {
@@ -140,26 +159,47 @@ class Router
             $paramType = $param->getType();
             $paramName = $param->getName();
 
-            if ($paramType && $paramType->getName() === HttpRequest::class) {
-                continue;
+            if (!$paramType) {
+                throw new ParameterMissingTypeDeclarationException(
+                    "Parameter $paramName of $className::$methodName is missing a type declaration!"
+                );
             }
 
-            if (isset($args[$paramName])) {
-                $value = $args[$paramName];
-
-                if ($paramType && $paramType->isBuiltin()) {
-                    $typeName = $paramType->getName();
-                    settype($value, $typeName);
+            if ($paramType instanceof ReflectionNamedType) {
+                if ($paramType->getName() === HttpRequest::class) {
+                    continue;
                 }
 
-                $castedArgs[] = $value;
-            } elseif ($param->isDefaultValueAvailable()) {
-                $castedArgs[] = $param->getDefaultValue();
-            } elseif ($paramType->allowsNull()) {
-                $castedArgs[] = null;
+                if (isset($args[$paramName])) {
+                    $value = $args[$paramName];
+
+                    if ($paramType->isBuiltin()) {
+                        $typeName = $paramType->getName();
+                        settype($value, $typeName);
+                    }
+
+                    $castedArgs[] = $value;
+                } elseif ($param->isDefaultValueAvailable()) {
+                    $castedArgs[] = $param->getDefaultValue();
+                } elseif ($paramType->allowsNull()) {
+                    $castedArgs[] = null;
+                } else {
+                    throw new MissingRequiredArgumentException(
+                        "Missing required argument $paramName for method $className::$methodName()"
+                    );
+                }
+            } elseif ($paramType instanceof ReflectionUnionType) {
+                throw new ParameterUnionTypeException(
+                    "Parameter $paramName of $className::$methodName cannot be of a union type!"
+                );
+            } elseif ($paramType instanceof ReflectionIntersectionType) {
+                throw new ParameterIntersectionTypeException(
+                    "Parameter $paramName of $className::$methodName cannot be of an intersection type!"
+                );
             } else {
-                throw new MissingRequiredArgumentException(
-                  "Missing required argument $paramName for method $className::$methodName()"
+                // Probably it's not reachable in current(8.5) PHP, but I'm leaving it in case of future changes or bugs
+                throw new InvalidParameterException(
+                    "Parameter $paramName of $className::$methodName is of an invalid type!"
                 );
             }
         }
@@ -167,22 +207,95 @@ class Router
         return $castedArgs;
     }
 
+    /**
+     * Caches Routes to the given filePath.
+     *
+     * @throws UnableToCacheRoutesException If unable to cache routes
+     */
     public function cacheRoutes(string $filePath): void
     {
+        $dir = dirname($filePath);
+
+        if (!((is_file($filePath) && is_writable($filePath)) || (!file_exists($filePath) && is_writable($dir)))) {
+            throw new UnableToCacheRoutesException(
+                "Unable to cache routes to the given file path: $filePath!"
+            );
+        }
+
         $content = '<?php' . PHP_EOL . '// This was generated automatically. Do not edit it!' . PHP_EOL .
             'return ' . var_export($this->routes, true) . ';';
 
-        file_put_contents($filePath, $content);
+        if (file_put_contents($filePath, $content) === false) {
+            throw new UnableToCacheRoutesException(
+                "Unable to cache routes to the given file path: $filePath!"
+            );
+        }
     }
 
-    public function loadFromCache(string $filePath): bool
+    private function canReadFile(string $filePath): bool
     {
-        if (!file_exists($filePath)) {
+        return is_file($filePath) && is_readable($filePath);
+    }
+
+    // TODO: IT'S NOT A VERY SAFE SOLUTION, SECURE IT SOON!
+    /**
+     * Loads Routes from a cache file.
+     *
+     * @param string $filePath Cache file path
+     * @return bool False if the file does not exist or the given path is not a file or it's not readable, True if the file is loaded successfully
+     */
+    public function loadRoutesFromCache(string $filePath): bool
+    {
+        if (!$this->canReadFile($filePath)) {
             return false;
         }
 
         $this->routes = require $filePath;
 
         return true;
+    }
+
+    // TODO: IT'S NOT A VERY SAFE SOLUTION, SECURE IT SOON!
+    /**
+     * Loads a Routes Registry File. It's meant to be a file where Routes are registered using Router methods.
+     *
+     * @return bool False if can not read the given filePath, True if the file is loaded successfully
+     */
+    public function loadRoutesFromRegistryFile(string $filePath): bool
+    {
+        if (!$this->canReadFile($filePath)) {
+            return false;
+        }
+
+        $router = $this;
+
+        require $filePath;
+
+        return true;
+    }
+
+    /**
+     * Loads routes from cache if it exists, otherwise loads from registry file and caches them.
+     *
+     * @throws UnableToCacheRoutesException
+     * @throws UnableToLoadRoutesException
+     */
+    public function loadRoutesFromCacheIfExistsElseFromRegistryFile(
+        string $cachePath,
+        string $routesRegistryPath,
+        bool   $cacheRoutesIfNotCached = true
+    ): void
+    {
+        if (!$this->loadRoutesFromCache($cachePath)) {
+            if ($this->loadRoutesFromRegistryFile($routesRegistryPath)) {
+                if ($cacheRoutesIfNotCached) {
+                    $this->cacheRoutes($cachePath);
+                }
+            } else {
+                throw new UnableToLoadRoutesException(
+                    "Router was unable to load routes either from cache file: $cachePath or registry file: $routesRegistryPath."
+                );
+            }
+        }
     }
 }
