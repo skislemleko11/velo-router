@@ -144,7 +144,7 @@ class PipelineTest extends TestCase
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertSame(200, $response->statusCode);
-        $this->assertSame('/modified-path', $controller->lastReceivedRequest?->url);
+        $this->assertSame('/modified-path', $controller->lastReceivedRequest?->urlPath);
     }
 
     #[Test]
@@ -296,7 +296,7 @@ class ModifyingRequestMiddleware implements MiddlewareInterface
 {
     public function handle(HttpRequest $request, callable $next): HttpResponse
     {
-        $modifiedRequest = new HttpRequest('/modified-path', $request->method);
+        $modifiedRequest = new HttpRequest('/modified-path', $request->requestMethod);
         return $next($modifiedRequest);
     }
 }

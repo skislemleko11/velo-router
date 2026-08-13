@@ -90,14 +90,14 @@ class Router
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
-        $route = $this->routes[$request->method][$request->url] ?? null;
+        $route = $this->routes[$request->requestMethod][$request->urlPath] ?? null;
 
         if ($route) {
             return $this->callAction($route, $request);
         }
 
-        foreach ($this->routes[$request->method] ?? [] as $route) {
-            if (preg_match($route->compiledRegex, $request->url, $matches)) {
+        foreach ($this->routes[$request->requestMethod] ?? [] as $route) {
+            if (preg_match($route->compiledRegex, $request->urlPath, $matches)) {
                 $namedArgs = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
                 return $this->callAction($route, $request, $namedArgs);
@@ -238,6 +238,7 @@ class Router
     }
 
     // TODO: IT'S NOT A VERY SAFE SOLUTION, SECURE IT SOON!
+
     /**
      * Loads Routes from a cache file.
      *
