@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 use Velo\Container\Container;
-use Velo\FileSystem\PathResolver\PathResolver;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Router\Exceptions\PageNotFoundException;
@@ -29,21 +28,11 @@ class RouterTest extends TestCase
 {
     protected Container $container;
     protected Router $router;
-    protected PathResolver $pathResolver;
     protected Pipeline $pipeline;
 
     protected function setUp(): void
     {
-        $this->pathResolver = new PathResolver(
-            basePath: '/',
-            publicPath: '/public/',
-            viewsPath: '/views/',
-            error403Path: null,
-            error404Path: '/views/error404.php',
-            error500Path: '/views/error500.php',
-        );
         $this->container = new Container();
-        $this->container->set(PathResolver::class, fn() => $this->pathResolver);
         $this->container->set(ContainerInterface::class, fn() => $this->container);
 
         $this->pipeline = new Pipeline($this->container);
@@ -87,7 +76,7 @@ class RouterTest extends TestCase
     public function it_resolves_a_simple_route(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'index');
         $request = new HttpRequest('/', 'GET');
@@ -104,7 +93,7 @@ class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/users/me', FakeController::class, 'index');
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
@@ -121,7 +110,7 @@ class RouterTest extends TestCase
     public function it_resolves_a_route_with_parameters_and_casts_them(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/users/{id}/{sth}', FakeController::class, 'actionWithParams');
 
@@ -139,7 +128,7 @@ class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/flags/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
@@ -156,7 +145,7 @@ class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/reports/{id}', FakeController::class, 'actionWithDefaultValue');
 
@@ -172,7 +161,7 @@ class RouterTest extends TestCase
     public function it_throws_missing_required_argument_exception_when_route_is_incomplete(): void
     {
         $this->expectException(MissingRequiredArgumentException::class);
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
         $request = new HttpRequest('/users/5', 'GET');
@@ -192,7 +181,7 @@ class RouterTest extends TestCase
     public function it_throws_controller_method_invalid_return_type_exception(): void
     {
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'invalidReturnType');
         $request = new HttpRequest('/', 'GET');
@@ -216,7 +205,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeMiddleware::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $this->router->get('/dashboard', FakeController::class, 'index')
@@ -235,7 +224,7 @@ class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(StoppingMiddleware::class, fn() => new StoppingMiddleware());
 
         $this->router->get('/protected', FakeController::class, 'index')
@@ -264,7 +253,7 @@ class RouterTest extends TestCase
         FakeController::$lastArgs = [];
         FakeMiddleware::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $this->router->get('/cached/{id}', FakeController::class, 'actionWithDefaultValue')
@@ -319,7 +308,7 @@ class RouterTest extends TestCase
     public function it_loads_routes_from_registry_file_when_cache_does_not_exist(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
         self::assertNotFalse($registryFile);
@@ -352,7 +341,7 @@ class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/cached-test/{id}', FakeController::class, 'actionWithDefaultValue');
         $cacheFile = tempnam(sys_get_temp_dir(), 'velo-router-');
@@ -408,7 +397,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(NotFoundMethodException::class);
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/test', FakeController::class, 'nonExistentMethod');
         $request = new HttpRequest('/test', 'GET');
@@ -420,7 +409,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(ParameterMissingTypeDeclarationException::class);
 
-        $this->container->set(TypesController::class, fn() => new TypesController($this->pathResolver));
+        $this->container->set(TypesController::class, fn() => new TypesController());
 
         $this->router->get('/types/{id}', TypesController::class, 'noType');
         $request = new HttpRequest('/types/5', 'GET');
@@ -444,7 +433,7 @@ class RouterTest extends TestCase
     {
         OrderTrackingMiddleware::$executionOrder = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(FirstOrderMiddleware::class, fn() => new FirstOrderMiddleware());
         $this->container->set(SecondOrderMiddleware::class, fn() => new SecondOrderMiddleware());
         $this->container->set(ThirdOrderMiddleware::class, fn() => new ThirdOrderMiddleware());
@@ -466,7 +455,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         ArgumentCapturingMiddleware::$capturedArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(ArgumentCapturingMiddleware::class, fn() => new ArgumentCapturingMiddleware());
 
         $this->router->get('/with-args', FakeController::class, 'index')
@@ -484,7 +473,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(MustImplementMiddlewareInterfaceException::class);
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(InvalidMiddleware::class, fn() => new InvalidMiddleware());
 
         $this->router->get('/bad-middleware', FakeController::class, 'index')
@@ -500,7 +489,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         CallableMiddlewareTest::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/callable', FakeController::class, 'index')
             ->addMiddleware(function (): MiddlewareInterface {
@@ -521,7 +510,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/api/{version}/users/{id}/posts/{postId}', FakeController::class, 'actionWithParams');
 
@@ -540,7 +529,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/nullable/{label}/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
@@ -557,7 +546,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/bool-test/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
@@ -575,7 +564,7 @@ class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeMiddleware::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $originalRoute = $this->router->get('/serialized', FakeController::class, 'index')
@@ -596,7 +585,7 @@ class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/special/endpoint', FakeController::class, 'index');
         $this->router->get('/special/{name}', FakeController::class, 'actionWithParams');
@@ -624,7 +613,7 @@ class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
         $this->router->get('/', FakeController::class, 'index');
 
         $request = new HttpRequest('/', 'GET');
@@ -640,7 +629,7 @@ class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController($this->pathResolver));
+        $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'actionWithParams');

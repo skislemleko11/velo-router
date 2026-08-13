@@ -8,7 +8,6 @@
   "require": {
     "php": ">=8.5",
     "skislemleko11/velo-http": "*",
-    "skislemleko11/velo-filesystem": "*",
     "psr/container": "^2.0"
   },
   "autoload": {
