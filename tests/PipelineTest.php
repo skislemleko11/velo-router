@@ -191,7 +191,7 @@ class PipelineTest extends TestCase
         $request = new HttpRequest('/test', 'GET');
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
-        $this->assertEquals(new HttpResponse(null, 200), $response);
+        $this->assertEquals(HttpResponse::plainText('content'), $response);
     }
 
     #[Test]
@@ -253,7 +253,7 @@ class PipelineFakeController
     {
         $this->wasCalled++;
         $this->lastReceivedRequest = $request;
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('content');
     }
 
     public function actionWithArgs(HttpRequest $request, int $id, string $name): HttpResponse
@@ -261,14 +261,14 @@ class PipelineFakeController
         $this->wasCalled++;
         $this->lastArgs = [$id, $name];
         $this->lastReceivedRequest = $request;
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('content');
     }
 
     public function actionCapturingRequest(HttpRequest $request): HttpResponse
     {
         $this->wasCalled++;
         $this->lastReceivedRequest = $request;
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('content');
     }
 
     public function invalidAction(HttpRequest $request): string
@@ -309,7 +309,7 @@ class MiddlewareWithArgs implements MiddlewareInterface
             return $next($request);
         }
 
-        return new HttpResponse(null, 500);
+        return HttpResponse::plainText('Internal Server Error', 500);
     }
 }
 
@@ -317,6 +317,6 @@ class StoppingPipelineMiddleware implements MiddlewareInterface
 {
     public function handle(HttpRequest $request, callable $next): HttpResponse
     {
-        return new HttpResponse(null, 403);
+        return HttpResponse::plainText('Forbidden', 403);
     }
 }

@@ -6,25 +6,24 @@ namespace Velo\Router\Tests;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use ReflectionClass;
 use Velo\Container\Container;
-use Velo\Controllers\Controller;
+use Velo\FileSystem\PathResolver\PathResolver;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Router\Exceptions\PageNotFoundException;
 use Velo\Router\Middlewares\MiddlewareInterface;
-use Velo\Router\PathResolver\PathResolver;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
-use Velo\Router\Router\Router;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
 use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundMethodException;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
-use ReflectionClass;
+use Velo\Router\Router\Router;
 
 class RouterTest extends TestCase
 {
@@ -654,7 +653,7 @@ class RouterTest extends TestCase
     }
 }
 
-class FakeController extends Controller
+class FakeController
 {
     public static int $wasCalled = 0;
     public static int $indexCalls = 0;
@@ -665,7 +664,7 @@ class FakeController extends Controller
     {
         self::$wasCalled++;
         self::$indexCalls++;
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('hehe');
     }
 
     public function actionWithParams(HttpRequest $request, int $id, int $sth): HttpResponse
@@ -673,21 +672,21 @@ class FakeController extends Controller
         self::$wasCalled++;
         self::$paramsCalls++;
         self::$lastArgs = ['id' => $id, 'sth' => $sth];
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('hehe');
     }
 
     public function actionWithDefaultValue(HttpRequest $request, int $id, string $type = 'default'): HttpResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['id' => $id, 'type' => $type];
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('hehe');
     }
 
     public function actionWithNullableAndTyped(HttpRequest $request, ?string $label, bool $active, float $ratio): HttpResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['label' => $label, 'active' => $active, 'ratio' => $ratio];
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('hehe');
     }
 
     /** @phpstan-ignore-next-line */
@@ -712,15 +711,15 @@ class StoppingMiddleware implements MiddlewareInterface
 {
     public function handle(HttpRequest $request, callable $next): HttpResponse
     {
-        return new HttpResponse(null, 403);
+        return HttpResponse::plainText('hehe', 403);
     }
 }
 
-class TypesController extends Controller
+class TypesController
 {
     public function noType(HttpRequest $request, $id): HttpResponse
     {
-        return new HttpResponse(null, 200);
+        return HttpResponse::plainText('hehe');
     }
 }
 
