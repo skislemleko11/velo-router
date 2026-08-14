@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Velo\Router\Route\Route;
 
-class RouteTest extends TestCase
+final class RouteTest extends TestCase
 {
     private Route $route;
 

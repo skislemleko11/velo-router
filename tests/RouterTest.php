@@ -24,7 +24,7 @@ use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
 use Velo\Router\Router\Router;
 
-class RouterTest extends TestCase
+final class RouterTest extends TestCase
 {
     protected Container $container;
     protected Router $router;

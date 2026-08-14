@@ -17,7 +17,7 @@ use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
 
-class PipelineTest extends TestCase
+final class PipelineTest extends TestCase
 {
     private FakeContainer $container;
     private Pipeline $pipeline;
