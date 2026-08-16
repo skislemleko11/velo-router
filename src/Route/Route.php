@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Velo\Router\Route;
 
+use Velo\Http\RequestMethod;
 use Velo\Router\Middlewares\AddMiddlewaresTrait;
 use Velo\Router\Middlewares\MiddlewareInterface;
 
@@ -16,11 +17,11 @@ class Route
     public readonly string $compiledRegex;
 
     public function __construct(
-        public readonly string $requestMethod,
-        public readonly string $path,
-        public readonly string $controller,
-        public readonly string $action,
-        ?string $compiledRegex = null
+        public readonly RequestMethod $requestMethod,
+        public readonly string        $path,
+        public readonly string        $controller,
+        public readonly string        $action,
+        ?string                       $compiledRegex = null
     )
     {
         if ($compiledRegex === null) {

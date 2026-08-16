@@ -12,19 +12,21 @@ use ReflectionNamedType;
 use ReflectionUnionType;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
-use Velo\Router\Exceptions\PageNotFoundException;
+use Velo\Http\RequestMethod;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\InvalidParameterException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\UnexpectedInvalidParameterException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
+use Velo\Router\Router\Exceptions\MethodNotAllowedException;
 use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
-use Velo\Router\Router\Exceptions\NotFoundMethodException;
+use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
+use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
 
@@ -49,7 +51,7 @@ class Router
      */
     public function get(string $path, string $controller, string $action): Route
     {
-        return $this->registerRoute('GET', $path, $controller, $action);
+        return $this->registerRoute(RequestMethod::GET, $path, $controller, $action);
     }
 
     /**
@@ -57,46 +59,77 @@ class Router
      */
     public function post(string $path, string $controller, string $action): Route
     {
-        return $this->registerRoute('POST', $path, $controller, $action);
+        return $this->registerRoute(RequestMethod::POST, $path, $controller, $action);
     }
 
     /**
      * Registers a Route with the given method.
      */
-    private function registerRoute(string $method, string $path, string $controller, string $action): Route
+    private function registerRoute(RequestMethod $requestMethod, string $path, string $controller, string $action): Route
     {
-        $route = new Route($method, $path, $controller, $action);
-        $this->routes[$method][$path] = $route;
+        $route = new Route($requestMethod, $path, $controller, $action);
+        $this->routes[$requestMethod->value][$path] = $route;
 
         return $route;
     }
 
     /**
-     * Resolves the given HttpRequest and calls callAction method to the appropriate controller method.
+     * Resolves the given HttpRequest.
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
-     * @throws InvalidParameterException
      * @throws MiddlewareNotFoundException
      * @throws MissingRequiredArgumentException
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundControllerException
      * @throws NotFoundExceptionInterface
-     * @throws NotFoundMethodException
-     * @throws PageNotFoundException
+     * @throws NotFoundControllerMethodException
+     * @throws RouteNotFound
      * @throws ParameterMissingTypeDeclarationException
      * @throws ParameterUnionTypeException
      * @throws ReflectionException
+     * @throws MethodNotAllowedException
+     * @throws ParameterIntersectionTypeException
+     * @throws UnexpectedInvalidParameterException
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
-        $route = $this->routes[$request->requestMethod][$request->urlPath] ?? null;
+        if ($response = $this->findMatch($request)) {
+            return $response;
+        }
 
-        if ($route) {
+        if ($allowedMethods = $this->findAllowedMethods($request)) {
+            throw new MethodNotAllowedException($allowedMethods);
+        }
+
+        throw new RouteNotFound();
+    }
+
+    /**
+     * Searchs for a matching Route for the given HttpRequest.
+     * Calls callAction method if found.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws ControllerMethodInvalidReturnTypeException
+     * @throws MiddlewareNotFoundException
+     * @throws ParameterUnionTypeException
+     * @throws MissingRequiredArgumentException
+     * @throws MustImplementMiddlewareInterfaceException
+     * @throws NotFoundControllerMethodException
+     * @throws NotFoundExceptionInterface
+     * @throws NotFoundControllerException
+     * @throws ReflectionException
+     * @throws ParameterMissingTypeDeclarationException
+     * @throws ParameterIntersectionTypeException
+     * @throws UnexpectedInvalidParameterException
+     */
+    private function findMatch(HttpRequest $request): ?HttpResponse
+    {
+        if ($route = $this->routes[$request->method->value][$request->urlPath] ?? null) {
             return $this->callAction($route, $request);
         }
 
-        foreach ($this->routes[$request->requestMethod] ?? [] as $route) {
+        foreach ($this->routes[$request->method->value] ?? [] as $route) {
             if (preg_match($route->compiledRegex, $request->urlPath, $matches)) {
                 $namedArgs = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
@@ -104,7 +137,36 @@ class Router
             }
         }
 
-        throw new PageNotFoundException();
+        return null;
+    }
+
+    /**
+     * Searchs for allowed methods for the given request.
+     * Used when findMatch method fails.
+     *
+     * @return list<string>
+     */
+    private function findAllowedMethods(HttpRequest $request): array
+    {
+        $allowedMethods = [];
+
+        foreach ($this->routes as $method => $routes) {
+            if ($method !== $request->method->value) {
+                if (isset($routes[$request->urlPath])) {
+                    $allowedMethods[] = $method;
+                    continue;
+                }
+
+                foreach ($routes as $route) {
+                    if (preg_match($route->compiledRegex, $request->urlPath)) {
+                        $allowedMethods[] = $method;
+                        continue 2;
+                    }
+                }
+            }
+        }
+
+        return $allowedMethods;
     }
 
     /**
@@ -112,25 +174,26 @@ class Router
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
-     * @throws InvalidParameterException
      * @throws MiddlewareNotFoundException
      * @throws MissingRequiredArgumentException
      * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundControllerException
      * @throws NotFoundExceptionInterface
-     * @throws NotFoundMethodException
+     * @throws NotFoundControllerMethodException
      * @throws ParameterMissingTypeDeclarationException
      * @throws ParameterUnionTypeException
      * @throws ReflectionException
+     * @throws ParameterIntersectionTypeException
+     * @throws UnexpectedInvalidParameterException
      */
     private function callAction(Route $route, HttpRequest $request, array $getMethodArgs = []): HttpResponse
     {
         if (!class_exists($route->controller)) {
-            throw new NotFoundControllerException();
+            throw new NotFoundControllerException("The requested controller: $route->controller was not found.");
         }
 
         if (!method_exists($route->controller, $route->action)) {
-            throw new NotFoundMethodException();
+            throw new NotFoundControllerMethodException("The requested method: $route->controller::$route->action was not found.");
         }
 
         $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getMethodArgs);
@@ -146,7 +209,7 @@ class Router
      * @throws ParameterMissingTypeDeclarationException
      * @throws ParameterUnionTypeException
      * @throws ParameterIntersectionTypeException
-     * @throws InvalidParameterException
+     * @throws UnexpectedInvalidParameterException
      */
     private function castMethodsArgs(string $className, string $methodName, array $args): array
     {
@@ -198,7 +261,7 @@ class Router
                 );
             } else {
                 // Probably it's not reachable in current(8.5) PHP, but I'm leaving it in case of future changes or bugs
-                throw new InvalidParameterException(
+                throw new UnexpectedInvalidParameterException(
                     "Parameter $paramName of $className::$methodName is of an invalid type!"
                 );
             }

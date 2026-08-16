@@ -64,13 +64,13 @@ readonly class Pipeline
                 $middlewareInstance = $middleware();
             } else {
                 throw new MustImplementMiddlewareInterfaceException(
-                    "Middleware must implement " . MiddlewareInterface::class
+                    'Middleware must implement ' . MiddlewareInterface::class
                 );
             }
 
             if (!$middlewareInstance instanceof MiddlewareInterface) {
                 throw new MustImplementMiddlewareInterfaceException(
-                    'Class ' . $middlewareInstance::class . ' must implement ' . MiddlewareInterface::class . "!"
+                    'Class ' . $middlewareInstance::class . ' must implement ' . MiddlewareInterface::class . '!'
                 );
             }
 

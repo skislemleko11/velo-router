@@ -3,7 +3,10 @@ declare(strict_types=1);
 
 namespace Velo\Router\Pipeline\Exceptions;
 
-class MiddlewareNotFoundException extends PipelineException
+use Exception;
+use Velo\Router\Pipeline\Exceptions\Interfaces\PipelineExceptionInterface;
+
+class MiddlewareNotFoundException extends Exception implements PipelineExceptionInterface
 {
     protected $message = 'Middleware not found!';
 }

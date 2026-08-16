@@ -6,7 +6,7 @@ namespace Velo\Router\Router\Exceptions\InvalidParameterExceptions;
 use Exception;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\Interfaces\InvalidParameterExceptionInterface;
 
-class ParameterNoDefaultValueException extends Exception implements InvalidParameterExceptionInterface
+class UnexpectedInvalidParameterException extends Exception implements InvalidParameterExceptionInterface
 {
-    protected $message = 'Parameter has no default value!';
+
 }

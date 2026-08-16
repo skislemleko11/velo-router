@@ -16,6 +16,7 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
+use Velo\Http\RequestMethod;
 
 final class PipelineTest extends TestCase
 {
@@ -34,8 +35,8 @@ final class PipelineTest extends TestCase
         $controller = new PipelineFakeController();
         $this->container->set(PipelineFakeController::class, $controller);
 
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
-        $request = new HttpRequest('/test', 'GET');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
+        $request = new HttpRequest('/test', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
@@ -50,8 +51,8 @@ final class PipelineTest extends TestCase
         $controller = new PipelineFakeController();
         $this->container->set(PipelineFakeController::class, $controller);
 
-        $route = new Route('GET', '/users/{id}', PipelineFakeController::class, 'actionWithArgs');
-        $request = new HttpRequest('/users/42', 'GET');
+        $route = new Route(RequestMethod::GET, '/users/{id}', PipelineFakeController::class, 'actionWithArgs');
+        $request = new HttpRequest('/users/42', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [42, 'john']);
 
@@ -70,11 +71,11 @@ final class PipelineTest extends TestCase
         $this->container->set('Middleware1', $middleware1);
         $this->container->set('Middleware2', $middleware2);
 
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $route->addMiddleware('Middleware1');
         $route->addMiddleware('Middleware2');
 
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
 
         StepMiddleware::$executionOrder = [];
 
@@ -94,10 +95,10 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
         $this->container->set(StoppingPipelineMiddleware::class, $stoppingMiddleware);
 
-        $route = new Route('GET', '/admin', PipelineFakeController::class, 'successAction');
+        $route = new Route(RequestMethod::GET, '/admin', PipelineFakeController::class, 'successAction');
         $route->addMiddleware(StoppingPipelineMiddleware::class);
 
-        $request = new HttpRequest('/admin', 'GET');
+        $request = new HttpRequest('/admin', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
@@ -113,7 +114,7 @@ final class PipelineTest extends TestCase
 
         $directMiddleware = new StepMiddleware('direct');
 
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
         StepMiddleware::$executionOrder = [];
 
         $response = $this->pipeline->executeMiddlewaresChain(
@@ -134,12 +135,12 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
 
         $modifyingMiddleware = new ModifyingRequestMiddleware();
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'actionCapturingRequest');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'actionCapturingRequest');
         $route->addMiddleware(ModifyingRequestMiddleware::class);
 
         $this->container->set(ModifyingRequestMiddleware::class, $modifyingMiddleware);
 
-        $request = new HttpRequest('/original-path', 'GET');
+        $request = new HttpRequest('/original-path', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
@@ -156,10 +157,10 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
         $this->container->set('InvalidMiddleware', $invalidMiddleware);
 
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $route->addMiddleware('InvalidMiddleware');
 
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
 
         $this->expectException(MustImplementMiddlewareInterfaceException::class);
         $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
@@ -171,8 +172,8 @@ final class PipelineTest extends TestCase
         $controller = new PipelineFakeController();
         $this->container->set(PipelineFakeController::class, $controller);
 
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'invalidAction');
-        $request = new HttpRequest('/test', 'GET');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'invalidAction');
+        $request = new HttpRequest('/test', RequestMethod::GET);
 
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
         $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
@@ -185,10 +186,10 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
         $this->container->set(MiddlewareWithArgs::class, new MiddlewareWithArgs());
 
-        $route = new Route('GET', '/test', PipelineFakeController::class, 'successAction');
+        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $route->addMiddleware([MiddlewareWithArgs::class, ['hehe', 'hihi']]);
 
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
         $this->assertEquals(HttpResponse::plainText('content'), $response);
@@ -205,7 +206,7 @@ final class PipelineTest extends TestCase
         StepMiddleware::$executionOrder = [];
 
         $response = $this->pipeline->executeMiddlewaresChain(
-            new HttpRequest('/test', 'GET'),
+            new HttpRequest('/test', RequestMethod::GET),
             [$factory],
             fn(HttpRequest $req) => $controller->successAction($req)
         );
@@ -296,7 +297,7 @@ class ModifyingRequestMiddleware implements MiddlewareInterface
 {
     public function handle(HttpRequest $request, callable $next): HttpResponse
     {
-        $modifiedRequest = new HttpRequest('/modified-path', $request->requestMethod);
+        $modifiedRequest = new HttpRequest('/modified-path', $request->method);
         return $next($modifiedRequest);
     }
 }

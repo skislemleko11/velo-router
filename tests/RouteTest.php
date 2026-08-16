@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Velo\Router\Route\Route;
+use Velo\Http\RequestMethod;
 
 final class RouteTest extends TestCase
 {
@@ -16,7 +17,7 @@ final class RouteTest extends TestCase
     protected function setUp(): void
     {
         $this->route = new Route(
-            'GET',
+            RequestMethod::GET,
             '/',
             'controller',
             'action'
@@ -27,7 +28,7 @@ final class RouteTest extends TestCase
     public function it_sets_middleware_and_returns_self(): void
     {
         $self = $this->route->addMiddleware('middleware');
-        $this->assertSame(['middleware'], $this->getProperty('middlewares'));
+        $this->assertSame(['middleware'], $this->getMiddlewaresProperty());
         $this->assertSame($this->route, $self);
     }
 
@@ -35,7 +36,7 @@ final class RouteTest extends TestCase
     public function it_keeps_a_custom_compiled_regex_passed_to_constructor(): void
     {
         $route = new Route(
-            'GET',
+            RequestMethod::GET,
             '/users/{id}',
             'controller',
             'action',
@@ -49,7 +50,7 @@ final class RouteTest extends TestCase
     public function it_sets_middleware_with_params_and_returns_self(): void
     {
         $self = $this->route->addMiddleware(['middleware', ['param1', 'param2']]);
-        $this->assertSame([['middleware', ['param1', 'param2']]], $this->getProperty('middlewares'));
+        $this->assertSame([['middleware', ['param1', 'param2']]], $this->getMiddlewaresProperty());
         $this->assertSame($this->route, $self);
     }
 
@@ -59,7 +60,7 @@ final class RouteTest extends TestCase
         $self = $this->route->addMiddlewares(['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]);
         $this->assertSame(
             [['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]],
-            $this->getProperty('middlewares')
+            $this->getMiddlewaresProperty()
         );
         $this->assertSame($this->route, $self);
     }
@@ -91,7 +92,7 @@ final class RouteTest extends TestCase
     public function it_exports_and_restores_state_using_set_state(): void
     {
         $route = new Route(
-            'POST',
+            RequestMethod::POST,
             '/articles/{slug}',
             'ArticleController',
             'show',
@@ -103,7 +104,7 @@ final class RouteTest extends TestCase
         $restoredRoute = eval('return ' . var_export($route, true) . ';');
 
         $this->assertInstanceOf(Route::class, $restoredRoute);
-        $this->assertSame('POST', $restoredRoute->requestMethod);
+        $this->assertSame(RequestMethod::POST, $restoredRoute->requestMethod);
         $this->assertSame('/articles/{slug}', $restoredRoute->path);
         $this->assertSame('ArticleController', $restoredRoute->controller);
         $this->assertSame('show', $restoredRoute->action);
@@ -123,10 +124,10 @@ final class RouteTest extends TestCase
         ];
     }
 
-    private function getProperty(string $propertyName): mixed
+    private function getMiddlewaresProperty(): mixed
     {
         $reflection = new ReflectionClass(Route::class);
-        $reflectionProperty = $reflection->getProperty($propertyName);
+        $reflectionProperty = $reflection->getProperty('middlewares');
         return $reflectionProperty->getValue($this->route);
     }
 }

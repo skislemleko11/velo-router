@@ -10,16 +10,20 @@ use ReflectionClass;
 use Velo\Container\Container;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
-use Velo\Router\Exceptions\PageNotFoundException;
+use Velo\Http\RequestMethod;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route\Route;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
+use Velo\Router\Router\Exceptions\MethodNotAllowedException;
 use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
-use Velo\Router\Router\Exceptions\NotFoundMethodException;
+use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
+use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
 use Velo\Router\Router\Router;
@@ -41,10 +45,10 @@ final class RouterTest extends TestCase
         $this->router = new Router($this->pipeline);
     }
 
-    private function getProperty(object $object, string $property): mixed
+    private function getRoutesProperty(object $object): mixed
     {
         $reflection = new ReflectionClass($object);
-        return $reflection->getProperty($property)
+        return $reflection->getProperty('routes')
             ->getValue($object);
     }
 
@@ -54,12 +58,12 @@ final class RouterTest extends TestCase
         $route = $this->router->get('/users', 'UserController', 'index');
 
         $this->assertInstanceOf(Route::class, $route);
-        $this->assertSame('GET', $route->requestMethod);
+        $this->assertSame(RequestMethod::GET, $route->requestMethod);
         $this->assertSame('/users', $route->path);
         $this->assertSame('UserController', $route->controller);
         $this->assertSame('index', $route->action);
 
-        $this->assertSame($route, $this->getProperty($this->router, 'routes')['GET']['/users']);
+        $this->assertSame($route, $this->getRoutesProperty($this->router)[RequestMethod::GET->value]['/users']);
     }
 
     #[Test]
@@ -68,8 +72,8 @@ final class RouterTest extends TestCase
         $route = $this->router->post('/users', 'UserController', 'create');
 
         $this->assertInstanceOf(Route::class, $route);
-        $this->assertSame('POST', $route->requestMethod);
-        $this->assertSame($route, $this->getProperty($this->router, 'routes')['POST']['/users']);
+        $this->assertSame(RequestMethod::POST, $route->requestMethod);
+        $this->assertSame($route, $this->getRoutesProperty($this->router)[RequestMethod::POST->value]['/users']);
     }
 
     #[Test]
@@ -79,7 +83,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'index');
-        $request = new HttpRequest('/', 'GET');
+        $request = new HttpRequest('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -98,7 +102,7 @@ final class RouterTest extends TestCase
         $this->router->get('/users/me', FakeController::class, 'index');
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/users/me', 'GET');
+        $request = new HttpRequest('/users/me', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -114,7 +118,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/users/{id}/{sth}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/users/5/100', 'GET');
+        $request = new HttpRequest('/users/5/100', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -132,7 +136,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/flags/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/flags/1/2.5', 'GET');
+        $request = new HttpRequest('/flags/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -149,7 +153,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/reports/{id}', FakeController::class, 'actionWithDefaultValue');
 
-        $request = new HttpRequest('/reports/7', 'GET');
+        $request = new HttpRequest('/reports/7', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -164,7 +168,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
-        $request = new HttpRequest('/users/5', 'GET');
+        $request = new HttpRequest('/users/5', RequestMethod::GET);
 
         $this->router->resolve($request);
     }
@@ -172,8 +176,8 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_page_not_found_exception(): void
     {
-        $this->expectException(PageNotFoundException::class);
-        $request = new HttpRequest('/users', 'GET');
+        $this->expectException(RouteNotFound::class);
+        $request = new HttpRequest('/users', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -184,7 +188,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'invalidReturnType');
-        $request = new HttpRequest('/', 'GET');
+        $request = new HttpRequest('/', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -211,7 +215,7 @@ final class RouterTest extends TestCase
         $this->router->get('/dashboard', FakeController::class, 'index')
             ->addMiddleware(FakeMiddleware::class);
 
-        $request = new HttpRequest('/dashboard', 'GET');
+        $request = new HttpRequest('/dashboard', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -230,7 +234,7 @@ final class RouterTest extends TestCase
         $this->router->get('/protected', FakeController::class, 'index')
             ->addMiddleware(StoppingMiddleware::class);
 
-        $request = new HttpRequest('/protected', 'GET');
+        $request = new HttpRequest('/protected', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -272,7 +276,7 @@ final class RouterTest extends TestCase
             $cachedRouter = new Router($this->pipeline);
             $this->assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
 
-            $request = new HttpRequest('/cached/42', 'GET');
+            $request = new HttpRequest('/cached/42', RequestMethod::GET);
             $result = $cachedRouter->resolve($request);
 
             $this->assertInstanceOf(HttpResponse::class, $result);
@@ -325,7 +329,7 @@ final class RouterTest extends TestCase
                 false
             );
 
-            $request = new HttpRequest('/registry', 'GET');
+            $request = new HttpRequest('/registry', RequestMethod::GET);
             $result = $newRouter->resolve($request);
 
             $this->assertInstanceOf(HttpResponse::class, $result);
@@ -361,7 +365,7 @@ final class RouterTest extends TestCase
                     false
                 );
 
-                $request = new HttpRequest('/cached-test/99', 'GET');
+                $request = new HttpRequest('/cached-test/99', RequestMethod::GET);
                 $result = $newRouter->resolve($request);
 
                 $this->assertInstanceOf(HttpResponse::class, $result);
@@ -388,19 +392,19 @@ final class RouterTest extends TestCase
         $this->expectException(NotFoundControllerException::class);
 
         $this->router->get('/test', 'NonExistentController', 'index');
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
     #[Test]
     public function it_throws_not_found_method_exception_when_method_does_not_exist(): void
     {
-        $this->expectException(NotFoundMethodException::class);
+        $this->expectException(NotFoundControllerMethodException::class);
 
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/test', FakeController::class, 'nonExistentMethod');
-        $request = new HttpRequest('/test', 'GET');
+        $request = new HttpRequest('/test', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -412,7 +416,7 @@ final class RouterTest extends TestCase
         $this->container->set(TypesController::class, fn() => new TypesController());
 
         $this->router->get('/types/{id}', TypesController::class, 'noType');
-        $request = new HttpRequest('/types/5', 'GET');
+        $request = new HttpRequest('/types/5', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -443,7 +447,7 @@ final class RouterTest extends TestCase
             ->addMiddleware(SecondOrderMiddleware::class)
             ->addMiddleware(ThirdOrderMiddleware::class);
 
-        $request = new HttpRequest('/ordered', 'GET');
+        $request = new HttpRequest('/ordered', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(['first', 'second', 'third'], OrderTrackingMiddleware::$executionOrder);
@@ -461,7 +465,7 @@ final class RouterTest extends TestCase
         $this->router->get('/with-args', FakeController::class, 'index')
             ->addMiddleware([ArgumentCapturingMiddleware::class, ['arg1', 'arg2', 42]]);
 
-        $request = new HttpRequest('/with-args', 'GET');
+        $request = new HttpRequest('/with-args', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(1, FakeController::$wasCalled);
@@ -479,7 +483,7 @@ final class RouterTest extends TestCase
         $this->router->get('/bad-middleware', FakeController::class, 'index')
             ->addMiddleware(InvalidMiddleware::class);
 
-        $request = new HttpRequest('/bad-middleware', 'GET');
+        $request = new HttpRequest('/bad-middleware', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -497,7 +501,7 @@ final class RouterTest extends TestCase
                 return new CallableTestMiddlewareImpl();
             });
 
-        $request = new HttpRequest('/callable', 'GET');
+        $request = new HttpRequest('/callable', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(1, FakeController::$wasCalled);
@@ -514,11 +518,11 @@ final class RouterTest extends TestCase
 
         $this->router->get('/api/{version}/users/{id}/posts/{postId}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/api/v1/users/123/posts/456', 'GET');
+        $request = new HttpRequest('/api/v1/users/123/posts/456', RequestMethod::GET);
 
         try {
             $this->router->resolve($request);
-        } catch (MissingRequiredArgumentException $e) {
+        } catch (MissingRequiredArgumentException) {
             $this->assertTrue(true);
         }
     }
@@ -533,7 +537,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/nullable/{label}/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/nullable/test/1/2.5', 'GET');
+        $request = new HttpRequest('/nullable/test/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -550,7 +554,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/bool-test/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/bool-test/0/1.5', 'GET');
+        $request = new HttpRequest('/bool-test/0/1.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -590,18 +594,19 @@ final class RouterTest extends TestCase
         $this->router->get('/special/endpoint', FakeController::class, 'index');
         $this->router->get('/special/{name}', FakeController::class, 'actionWithParams');
 
-        $exactRequest = new HttpRequest('/special/endpoint', 'GET');
-        $exactResult = $this->router->resolve($exactRequest);
+        $exactRequest = new HttpRequest('/special/endpoint', RequestMethod::GET);
+        $this->router->resolve($exactRequest);
+
         $this->assertSame(1, FakeController::$indexCalls);
         $this->assertSame(0, FakeController::$paramsCalls);
 
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $paramRequest = new HttpRequest('/special/something', 'GET');
+        $paramRequest = new HttpRequest('/special/something', RequestMethod::GET);
         try {
             $this->router->resolve($paramRequest);
-        } catch (MissingRequiredArgumentException $e) {
+        } catch (MissingRequiredArgumentException) {
             $this->assertTrue(true);
             return;
         }
@@ -616,7 +621,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
         $this->router->get('/', FakeController::class, 'index');
 
-        $request = new HttpRequest('/', 'GET');
+        $request = new HttpRequest('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
         $this->assertInstanceOf(HttpResponse::class, $result);
@@ -634,11 +639,299 @@ final class RouterTest extends TestCase
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'actionWithParams');
 
-        $getRequest = new HttpRequest('/resource', 'GET');
+        $getRequest = new HttpRequest('/resource', RequestMethod::GET);
         $getResult = $this->router->resolve($getRequest);
 
         $this->assertInstanceOf(HttpResponse::class, $getResult);
         $this->assertSame(1, FakeController::$indexCalls);
+    }
+
+    #[Test]
+    public function it_throws_method_not_allowed_exception_for_existing_route_with_wrong_method(): void
+    {
+        $this->container->set(FakeController::class, fn() => new FakeController());
+
+        $this->router->get('/users', FakeController::class, 'index');
+
+        $request = new HttpRequest('/users', RequestMethod::POST);
+
+        try {
+            $this->router->resolve($request);
+            $this->fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            $this->assertContains(RequestMethod::GET->value, $exception->allowedMethods);
+        }
+    }
+
+    #[Test]
+    public function it_throws_method_not_allowed_exception_for_parameterized_route_with_wrong_method(): void
+    {
+        $this->container->set(FakeController::class, fn() => new FakeController());
+
+        $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
+
+        $request = new HttpRequest('/users/123', RequestMethod::POST);
+
+        try {
+            $this->router->resolve($request);
+            $this->fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            $this->assertContains(RequestMethod::GET->value, $exception->allowedMethods);
+        }
+    }
+
+    #[Test]
+    public function it_returns_all_allowed_methods_for_matching_path(): void
+    {
+        $this->container->set(FakeController::class, fn() => new FakeController());
+
+        $this->router->get('/resource', FakeController::class, 'index');
+        $this->router->post('/resource', FakeController::class, 'index');
+
+        $request = new HttpRequest('/resource', RequestMethod::PUT);
+
+        try {
+            $this->router->resolve($request);
+            $this->fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            $allowedMethods = $exception->allowedMethods;
+
+            $this->assertContains(RequestMethod::GET->value, $allowedMethods);
+            $this->assertContains(RequestMethod::POST->value, $allowedMethods);
+        }
+    }
+
+    #[Test]
+    public function it_throws_union_type_exception_for_controller_parameter(): void
+    {
+        $this->expectException(ParameterUnionTypeException::class);
+
+        $this->container->set(TypesController::class, fn() => new TypesController());
+
+        $this->router->get('/types/{id}', TypesController::class, 'unionType');
+
+        $request = new HttpRequest('/types/5', RequestMethod::GET);
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_throws_intersection_type_exception_for_controller_parameter(): void
+    {
+        $this->expectException(ParameterIntersectionTypeException::class);
+
+        $this->container->set(TypesController::class, fn() => new TypesController());
+
+        $this->router->get('/types/{value}', TypesController::class, 'intersectionType');
+
+        $request = new HttpRequest('/types/test', RequestMethod::GET);
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_throws_missing_required_argument_when_parameter_is_not_nullable_and_has_no_default(): void
+    {
+        $this->expectException(MissingRequiredArgumentException::class);
+
+        $this->container->set(TypesController::class, fn() => new TypesController());
+
+        $this->router->get('/types/{id}', TypesController::class, 'requiredParameter');
+
+        $request = new HttpRequest('/types/5', RequestMethod::GET);
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_passes_null_for_missing_nullable_parameter(): void
+    {
+        NullableController::$receivedValue = 'not-null';
+
+        $this->container->set(
+            NullableController::class,
+            fn() => new NullableController()
+        );
+
+        $this->router->get('/nullable', NullableController::class, 'index');
+
+        $request = new HttpRequest('/nullable', RequestMethod::GET);
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertNull(NullableController::$receivedValue);
+    }
+
+    #[Test]
+    public function it_does_not_pass_http_request_as_controller_argument(): void
+    {
+        RequestParameterController::$receivedArguments = [];
+
+        $this->container->set(
+            RequestParameterController::class,
+            fn() => new RequestParameterController()
+        );
+
+        $this->router->get(
+            '/request/{id}',
+            RequestParameterController::class,
+            'index'
+        );
+
+        $request = new HttpRequest('/request/42', RequestMethod::GET);
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame([42], RequestParameterController::$receivedArguments);
+    }
+
+    #[Test]
+    public function it_casts_string_route_parameter_to_string(): void
+    {
+        StringParameterController::$receivedValue = null;
+
+        $this->container->set(
+            StringParameterController::class,
+            fn() => new StringParameterController()
+        );
+
+        $this->router->get(
+            '/string/{value}',
+            StringParameterController::class,
+            'index'
+        );
+
+        $request = new HttpRequest('/string/123', RequestMethod::GET);
+        $this->router->resolve($request);
+
+        $this->assertSame('123', StringParameterController::$receivedValue);
+    }
+
+    #[Test]
+    public function it_loads_registry_file_and_caches_routes_when_enabled(): void
+    {
+        FakeController::$wasCalled = 0;
+
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
+        self::assertNotFalse($registryFile);
+
+        $cacheFile = sys_get_temp_dir() . '/velo-cache-' . uniqid('', true) . '.php';
+
+        try {
+            file_put_contents(
+                $registryFile,
+                '<?php $router->get("/cached-registry", "' .
+                FakeController::class .
+                '", "index");'
+            );
+
+            $this->router->loadRoutesFromCacheIfExistsElseFromRegistryFile(
+                $cacheFile,
+                $registryFile,
+                true
+            );
+
+            $this->assertFileExists($cacheFile);
+
+            $newRouter = new Router($this->pipeline);
+
+            $this->assertTrue(
+                $newRouter->loadRoutesFromCache($cacheFile)
+            );
+
+            $request = new HttpRequest(
+                '/cached-registry',
+                RequestMethod::GET
+            );
+
+            $result = $newRouter->resolve($request);
+
+            $this->assertInstanceOf(HttpResponse::class, $result);
+            $this->assertSame(1, FakeController::$wasCalled);
+        } finally {
+            @unlink($registryFile);
+            @unlink($cacheFile);
+        }
+    }
+
+    #[Test]
+    public function it_does_not_overwrite_cache_when_cache_exists(): void
+    {
+        $cacheFile = tempnam(sys_get_temp_dir(), 'velo-cache-');
+        self::assertNotFalse($cacheFile);
+
+        $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
+        self::assertNotFalse($registryFile);
+
+        try {
+            file_put_contents(
+                $cacheFile,
+                '<?php return [];'
+            );
+
+            file_put_contents(
+                $registryFile,
+                '<?php $router->get("/registry", "' .
+                FakeController::class .
+                '", "index");'
+            );
+
+            $this->router->loadRoutesFromCacheIfExistsElseFromRegistryFile(
+                $cacheFile,
+                $registryFile
+            );
+
+            $routes = $this->getRoutesProperty($this->router);
+
+            $this->assertSame([], $routes);
+        } finally {
+            @unlink($cacheFile);
+            @unlink($registryFile);
+        }
+    }
+
+    #[Test]
+    public function it_does_not_cache_routes_when_cache_creation_is_disabled(): void
+    {
+        $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
+        self::assertNotFalse($registryFile);
+
+        $cacheFile = sys_get_temp_dir() .
+            '/velo-cache-' .
+            uniqid('', true) .
+            '.php';
+
+        try {
+            file_put_contents(
+                $registryFile,
+                '<?php $router->get("/registry", "' .
+                FakeController::class .
+                '", "index");'
+            );
+
+            $this->router->loadRoutesFromCacheIfExistsElseFromRegistryFile(
+                $cacheFile,
+                $registryFile,
+                false
+            );
+
+            $this->assertFileDoesNotExist($cacheFile);
+
+            $routes = $this->getRoutesProperty($this->router);
+
+            $this->assertArrayHasKey(
+                RequestMethod::GET->value,
+                $routes
+            );
+        } finally {
+            @unlink($registryFile);
+            @unlink($cacheFile);
+        }
     }
 }
 
@@ -710,6 +1003,36 @@ class TypesController
     {
         return HttpResponse::plainText('hehe');
     }
+
+    public function unionType(
+        HttpRequest $request,
+        int|string $id
+    ): HttpResponse {
+        return HttpResponse::plainText('hehe');
+    }
+
+    public function intersectionType(
+        HttpRequest $request,
+        TypesControllerInterface&AnotherTypesControllerInterface $value
+    ): HttpResponse {
+        return HttpResponse::plainText('hehe');
+    }
+
+    public function requiredParameter(
+        HttpRequest $request,
+        int $id,
+        string $required
+    ): HttpResponse {
+        return HttpResponse::plainText('hehe');
+    }
+}
+
+interface TypesControllerInterface
+{
+}
+
+interface AnotherTypesControllerInterface
+{
 }
 
 class OrderTrackingMiddleware implements MiddlewareInterface
@@ -779,3 +1102,44 @@ class CallableTestMiddlewareImpl implements MiddlewareInterface
     }
 }
 
+class NullableController
+{
+    public static mixed $receivedValue = null;
+
+    public function index(
+        HttpRequest $request,
+        ?string $value
+    ): HttpResponse {
+        self::$receivedValue = $value;
+
+        return HttpResponse::plainText('hehe');
+    }
+}
+
+class RequestParameterController
+{
+    public static array $receivedArguments = [];
+
+    public function index(
+        HttpRequest $request,
+        int $id
+    ): HttpResponse {
+        self::$receivedArguments = [$id];
+
+        return HttpResponse::plainText('hehe');
+    }
+}
+
+class StringParameterController
+{
+    public static ?string $receivedValue = null;
+
+    public function index(
+        HttpRequest $request,
+        string $value
+    ): HttpResponse {
+        self::$receivedValue = $value;
+
+        return HttpResponse::plainText('hehe');
+    }
+}
