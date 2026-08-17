@@ -270,8 +270,8 @@ final class RouterTest extends TestCase
             $this->router->cacheRoutes($cacheFile);
 
             $this->assertFileExists($cacheFile);
-            $this->assertStringContainsString('FakeController', (string) file_get_contents($cacheFile));
-            $this->assertStringContainsString('FakeMiddleware', (string) file_get_contents($cacheFile));
+            $this->assertStringContainsString('FakeController', (string)file_get_contents($cacheFile));
+            $this->assertStringContainsString('FakeMiddleware', (string)file_get_contents($cacheFile));
 
             $cachedRouter = new Router($this->pipeline);
             $this->assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
@@ -522,12 +522,14 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve($request);
+            $this->fail('Expected MissingRequiredArgumentException');
         } catch (MissingRequiredArgumentException) {
             $this->assertTrue(true);
         }
     }
 
-    #[Test]
+    #[
+        Test]
     public function it_resolves_route_with_all_nullable_parameters(): void
     {
         FakeController::$wasCalled = 0;
@@ -933,6 +935,206 @@ final class RouterTest extends TestCase
             @unlink($cacheFile);
         }
     }
+
+    #[Test]
+    public function it_registers_every_supported_http_method(): void
+    {
+        $routes = [
+            'get' => RequestMethod::GET,
+            'post' => RequestMethod::POST,
+            'put' => RequestMethod::PUT,
+            'patch' => RequestMethod::PATCH,
+            'delete' => RequestMethod::DELETE,
+            'query' => RequestMethod::QUERY,
+            'head' => RequestMethod::HEAD,
+            'options' => RequestMethod::OPTIONS,
+        ];
+
+        foreach ($routes as $method => $requestMethod) {
+            $path = '/method-' . $method;
+
+            $route = $this->router->{$method}(
+                $path,
+                FakeController::class,
+                'index'
+            );
+
+            $this->assertSame($requestMethod, $route->requestMethod);
+            $this->assertSame(
+                $route,
+                $this->getRoutesProperty($this->router)[$requestMethod->value][$path]
+            );
+        }
+    }
+
+    #[Test]
+    public function it_resolves_head_request_using_get_route_when_head_is_not_registered(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$indexCalls = 0;
+
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $this->router->get(
+            '/head-fallback',
+            FakeController::class,
+            'index'
+        );
+
+        $request = new HttpRequest(
+            '/head-fallback',
+            RequestMethod::HEAD
+        );
+
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$wasCalled);
+        $this->assertSame(1, FakeController::$indexCalls);
+    }
+
+    #[Test]
+    public function it_resolves_parameterized_head_request_using_get_route_when_head_is_not_registered(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$lastArgs = [];
+
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $this->router->get(
+            '/head-fallback/{id}',
+            FakeController::class,
+            'actionWithDefaultValue'
+        );
+
+        $request = new HttpRequest(
+            '/head-fallback/42',
+            RequestMethod::HEAD
+        );
+
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$wasCalled);
+        $this->assertSame(
+            ['id' => 42, 'type' => 'default'],
+            FakeController::$lastArgs
+        );
+    }
+
+    #[Test]
+    public function it_prefers_registered_head_route_over_get_fallback(): void
+    {
+        FakeController::$wasCalled = 0;
+        FakeController::$indexCalls = 0;
+        FakeController::$headCalls = 0;
+
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $this->router->get(
+            '/head-priority',
+            FakeController::class,
+            'index'
+        );
+
+        $this->router->head(
+            '/head-priority',
+            FakeController::class,
+            'head'
+        );
+
+        $request = new HttpRequest(
+            '/head-priority',
+            RequestMethod::HEAD
+        );
+
+        $result = $this->router->resolve($request);
+
+        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertSame(1, FakeController::$wasCalled);
+        $this->assertSame(0, FakeController::$indexCalls);
+        $this->assertSame(1, FakeController::$headCalls);
+    }
+
+    #[Test]
+    public function it_returns_method_not_allowed_for_head_when_only_non_get_route_exists(): void
+    {
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $this->router->post(
+            '/head-not-allowed',
+            FakeController::class,
+            'index'
+        );
+
+        $this->expectException(MethodNotAllowedException::class);
+
+        $request = new HttpRequest(
+            '/head-not-allowed',
+            RequestMethod::HEAD
+        );
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_returns_all_allowed_methods_for_a_parameterized_path(): void
+    {
+        $this->container->set(
+            FakeController::class,
+            fn() => new FakeController()
+        );
+
+        $this->router->get(
+            '/multi-method/{id}',
+            FakeController::class,
+            'actionWithDefaultValue'
+        );
+
+        $this->router->post(
+            '/multi-method/{id}',
+            FakeController::class,
+            'actionWithDefaultValue'
+        );
+
+        $this->router->put(
+            '/multi-method/{id}',
+            FakeController::class,
+            'actionWithDefaultValue'
+        );
+
+        try {
+            $this->router->resolve(
+                new HttpRequest(
+                    '/multi-method/42',
+                    RequestMethod::DELETE
+                )
+            );
+
+            $this->fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            $this->assertSame(
+                [
+                    RequestMethod::GET->value,
+                    RequestMethod::POST->value,
+                    RequestMethod::PUT->value,
+                ],
+                $exception->allowedMethods
+            );
+        }
+    }
 }
 
 class FakeController
@@ -940,6 +1142,7 @@ class FakeController
     public static int $wasCalled = 0;
     public static int $indexCalls = 0;
     public static int $paramsCalls = 0;
+    public static int $headCalls = 0;
     public static array $lastArgs = [];
 
     public function index(HttpRequest $request): HttpResponse
@@ -971,10 +1174,17 @@ class FakeController
         return HttpResponse::plainText('hehe');
     }
 
-    /** @phpstan-ignore-next-line */
     public function invalidReturnType(HttpRequest $request): string
     {
         return 'string';
+    }
+
+    public function head(HttpRequest $request): HttpResponse
+    {
+        self::$wasCalled++;
+        self::$headCalls++;
+
+        return HttpResponse::plainText('head');
     }
 }
 
@@ -1006,23 +1216,26 @@ class TypesController
 
     public function unionType(
         HttpRequest $request,
-        int|string $id
-    ): HttpResponse {
+        int|string  $id
+    ): HttpResponse
+    {
         return HttpResponse::plainText('hehe');
     }
 
     public function intersectionType(
-        HttpRequest $request,
+        HttpRequest                                              $request,
         TypesControllerInterface&AnotherTypesControllerInterface $value
-    ): HttpResponse {
+    ): HttpResponse
+    {
         return HttpResponse::plainText('hehe');
     }
 
     public function requiredParameter(
         HttpRequest $request,
-        int $id,
-        string $required
-    ): HttpResponse {
+        int         $id,
+        string      $required
+    ): HttpResponse
+    {
         return HttpResponse::plainText('hehe');
     }
 }
@@ -1108,8 +1321,9 @@ class NullableController
 
     public function index(
         HttpRequest $request,
-        ?string $value
-    ): HttpResponse {
+        ?string     $value
+    ): HttpResponse
+    {
         self::$receivedValue = $value;
 
         return HttpResponse::plainText('hehe');
@@ -1122,8 +1336,9 @@ class RequestParameterController
 
     public function index(
         HttpRequest $request,
-        int $id
-    ): HttpResponse {
+        int         $id
+    ): HttpResponse
+    {
         self::$receivedArguments = [$id];
 
         return HttpResponse::plainText('hehe');
@@ -1136,8 +1351,9 @@ class StringParameterController
 
     public function index(
         HttpRequest $request,
-        string $value
-    ): HttpResponse {
+        string      $value
+    ): HttpResponse
+    {
         self::$receivedValue = $value;
 
         return HttpResponse::plainText('hehe');

@@ -10,6 +10,7 @@ use ReflectionIntersectionType;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionUnionType;
+use ValueError;
 use Velo\Http\HttpRequest;
 use Velo\Http\HttpResponse;
 use Velo\Http\RequestMethod;
@@ -63,6 +64,54 @@ class Router
     }
 
     /**
+     * Registers Route with PUT method.
+     */
+    public function put(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::PUT, $path, $controller, $action);
+    }
+
+    /**
+     * Registers Route with PATCH method.
+     */
+    public function patch(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::PATCH, $path, $controller, $action);
+    }
+
+    /**
+     * Registers Route with DELETE method.
+     */
+    public function delete(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::DELETE, $path, $controller, $action);
+    }
+
+    /**
+     * Registers Route with QUERY method.
+     */
+    public function query(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::QUERY, $path, $controller, $action);
+    }
+
+    /**
+     * Registers Route with HEAD method.
+     */
+    public function head(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::HEAD, $path, $controller, $action);
+    }
+
+    /**
+     * Registers Route with OPTIONS method.
+     */
+    public function options(string $path, string $controller, string $action): Route
+    {
+        return $this->registerRoute(RequestMethod::OPTIONS, $path, $controller, $action);
+    }
+
+    /**
      * Registers a Route with the given method.
      */
     private function registerRoute(RequestMethod $requestMethod, string $path, string $controller, string $action): Route
@@ -91,6 +140,7 @@ class Router
      * @throws MethodNotAllowedException
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
+     * @throws ValueError
      */
     public function resolve(HttpRequest $request): HttpResponse
     {
@@ -98,11 +148,43 @@ class Router
             return $response;
         }
 
+        if ($request->method === RequestMethod::HEAD) {
+            return $this->handleHeadRequestIfNotRegistered($request);
+        }
+
         if ($allowedMethods = $this->findAllowedMethods($request)) {
             throw new MethodNotAllowedException($allowedMethods);
         }
 
         throw new RouteNotFound();
+    }
+
+    /**
+     * Handles the given HEAD request by cloning it, changing method to GET and handling this request.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws MiddlewareNotFoundException
+     * @throws ControllerMethodInvalidReturnTypeException
+     * @throws MethodNotAllowedException
+     * @throws ParameterUnionTypeException
+     * @throws MissingRequiredArgumentException
+     * @throws MustImplementMiddlewareInterfaceException
+     * @throws NotFoundControllerMethodException
+     * @throws NotFoundExceptionInterface
+     * @throws UnexpectedInvalidParameterException
+     * @throws ParameterIntersectionTypeException
+     * @throws NotFoundControllerException
+     * @throws ReflectionException
+     * @throws RouteNotFound
+     * @throws ParameterMissingTypeDeclarationException
+     * @throws ValueError
+     */
+    private function handleHeadRequestIfNotRegistered(HttpRequest $request): HttpResponse
+    {
+        $getRequest = clone $request;
+        $getRequest->changeMethodFromHeadToGet();
+
+        return $this->resolve($getRequest);
     }
 
     /**
