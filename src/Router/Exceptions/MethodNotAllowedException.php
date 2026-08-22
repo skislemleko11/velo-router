@@ -5,14 +5,14 @@ namespace Velo\Router\Router\Exceptions;
 
 use Exception;
 use Throwable;
-use Velo\Exceptions\Interfaces\HttpExceptionWithHeadersInterface;
+use Velo\Exceptions\Interfaces\HttpResponseExceptionWithHeadersInterface;
 use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
 
 /**
  * It's thrown in Router class when the requested url is not found under the requested method, but under another one.
  * It represents 405 Error.
  */
-class MethodNotAllowedException extends Exception implements RouterExceptionInterface, HttpExceptionWithHeadersInterface
+class MethodNotAllowedException extends Exception implements RouterExceptionInterface, HttpResponseExceptionWithHeadersInterface
 {
     public function __construct(
         public readonly array $allowedMethods,

@@ -11,9 +11,9 @@ use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionUnionType;
 use ValueError;
-use Velo\Http\HttpRequest;
-use Velo\Http\HttpResponse;
+use Velo\Http\Request;
 use Velo\Http\RequestMethod;
+use Velo\Http\Responses\Response;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
@@ -32,7 +32,7 @@ use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
 
 /**
- * Router class, it registers Routes and resolves HttpRequests.
+ * Router class, it registers Routes and resolves Requests.
  */
 class Router
 {
@@ -123,7 +123,7 @@ class Router
     }
 
     /**
-     * Resolves the given HttpRequest.
+     * Resolves the given Request.
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
@@ -142,7 +142,7 @@ class Router
      * @throws UnexpectedInvalidParameterException
      * @throws ValueError
      */
-    public function resolve(HttpRequest $request): HttpResponse
+    public function resolve(Request $request): Response
     {
         if ($response = $this->findMatch($request)) {
             return $response;
@@ -179,7 +179,7 @@ class Router
      * @throws ParameterMissingTypeDeclarationException
      * @throws ValueError
      */
-    private function handleHeadRequestIfNotRegistered(HttpRequest $request): HttpResponse
+    private function handleHeadRequestIfNotRegistered(Request $request): Response
     {
         $getRequest = clone $request;
         $getRequest->changeMethodFromHeadToGet();
@@ -188,7 +188,7 @@ class Router
     }
 
     /**
-     * Searchs for a matching Route for the given HttpRequest.
+     * Searchs for a matching Route for the given Request.
      * Calls callAction method if found.
      *
      * @throws ContainerExceptionInterface
@@ -205,7 +205,7 @@ class Router
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
      */
-    private function findMatch(HttpRequest $request): ?HttpResponse
+    private function findMatch(Request $request): ?Response
     {
         if ($route = $this->routes[$request->method->value][$request->urlPath] ?? null) {
             return $this->callAction($route, $request);
@@ -228,7 +228,7 @@ class Router
      *
      * @return list<string>
      */
-    private function findAllowedMethods(HttpRequest $request): array
+    private function findAllowedMethods(Request $request): array
     {
         $allowedMethods = [];
 
@@ -268,7 +268,7 @@ class Router
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
      */
-    private function callAction(Route $route, HttpRequest $request, array $getMethodArgs = []): HttpResponse
+    private function callAction(Route $route, Request $request, array $getMethodArgs = []): Response
     {
         if (!class_exists($route->controller)) {
             throw new NotFoundControllerException("The requested controller: $route->controller was not found.");
@@ -311,7 +311,7 @@ class Router
             }
 
             if ($paramType instanceof ReflectionNamedType) {
-                if ($paramType->getName() === HttpRequest::class) {
+                if ($paramType->getName() === Request::class) {
                     continue;
                 }
 

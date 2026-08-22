@@ -8,9 +8,10 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 use Velo\Container\Container;
-use Velo\Http\HttpRequest;
-use Velo\Http\HttpResponse;
+use Velo\Http\Request;
 use Velo\Http\RequestMethod;
+use Velo\Http\Responses\Concrete\TextResponse;
+use Velo\Http\Responses\Response;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
@@ -83,10 +84,10 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'index');
-        $request = new HttpRequest('/', RequestMethod::GET);
+        $request = new Request('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
     }
 
@@ -102,10 +103,10 @@ final class RouterTest extends TestCase
         $this->router->get('/users/me', FakeController::class, 'index');
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/users/me', RequestMethod::GET);
+        $request = new Request('/users/me', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$indexCalls);
         $this->assertSame(0, FakeController::$paramsCalls);
     }
@@ -118,10 +119,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/users/{id}/{sth}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/users/5/100', RequestMethod::GET);
+        $request = new Request('/users/5/100', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(5, FakeController::$lastArgs['id']);
         $this->assertSame(100, FakeController::$lastArgs['sth']);
@@ -136,10 +137,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/flags/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/flags/1/2.5', RequestMethod::GET);
+        $request = new Request('/flags/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(['label' => null, 'active' => true, 'ratio' => 2.5], FakeController::$lastArgs);
     }
@@ -153,10 +154,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/reports/{id}', FakeController::class, 'actionWithDefaultValue');
 
-        $request = new HttpRequest('/reports/7', RequestMethod::GET);
+        $request = new Request('/reports/7', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(['id' => 7, 'type' => 'default'], FakeController::$lastArgs);
     }
@@ -168,7 +169,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
-        $request = new HttpRequest('/users/5', RequestMethod::GET);
+        $request = new Request('/users/5', RequestMethod::GET);
 
         $this->router->resolve($request);
     }
@@ -177,7 +178,7 @@ final class RouterTest extends TestCase
     public function it_throws_page_not_found_exception(): void
     {
         $this->expectException(RouteNotFound::class);
-        $request = new HttpRequest('/users', RequestMethod::GET);
+        $request = new Request('/users', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -188,7 +189,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/', FakeController::class, 'invalidReturnType');
-        $request = new HttpRequest('/', RequestMethod::GET);
+        $request = new Request('/', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -215,10 +216,10 @@ final class RouterTest extends TestCase
         $this->router->get('/dashboard', FakeController::class, 'index')
             ->addMiddleware(FakeMiddleware::class);
 
-        $request = new HttpRequest('/dashboard', RequestMethod::GET);
+        $request = new Request('/dashboard', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeMiddleware::$wasCalled);
         $this->assertSame(1, FakeController::$wasCalled);
     }
@@ -234,10 +235,10 @@ final class RouterTest extends TestCase
         $this->router->get('/protected', FakeController::class, 'index')
             ->addMiddleware(StoppingMiddleware::class);
 
-        $request = new HttpRequest('/protected', RequestMethod::GET);
+        $request = new Request('/protected', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(403, $result->statusCode);
         $this->assertSame(0, FakeController::$wasCalled);
     }
@@ -276,10 +277,10 @@ final class RouterTest extends TestCase
             $cachedRouter = new Router($this->pipeline);
             $this->assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
 
-            $request = new HttpRequest('/cached/42', RequestMethod::GET);
+            $request = new Request('/cached/42', RequestMethod::GET);
             $result = $cachedRouter->resolve($request);
 
-            $this->assertInstanceOf(HttpResponse::class, $result);
+            $this->assertInstanceOf(TextResponse::class, $result);
             $this->assertSame(1, FakeMiddleware::$wasCalled);
             $this->assertSame(1, FakeController::$wasCalled);
             $this->assertSame(['id' => 42, 'type' => 'default'], FakeController::$lastArgs);
@@ -329,10 +330,10 @@ final class RouterTest extends TestCase
                 false
             );
 
-            $request = new HttpRequest('/registry', RequestMethod::GET);
+            $request = new Request('/registry', RequestMethod::GET);
             $result = $newRouter->resolve($request);
 
-            $this->assertInstanceOf(HttpResponse::class, $result);
+            $this->assertInstanceOf(TextResponse::class, $result);
             $this->assertSame(1, FakeController::$wasCalled);
         } finally {
             @unlink($registryFile);
@@ -365,10 +366,10 @@ final class RouterTest extends TestCase
                     false
                 );
 
-                $request = new HttpRequest('/cached-test/99', RequestMethod::GET);
+                $request = new Request('/cached-test/99', RequestMethod::GET);
                 $result = $newRouter->resolve($request);
 
-                $this->assertInstanceOf(HttpResponse::class, $result);
+                $this->assertInstanceOf(TextResponse::class, $result);
                 $this->assertSame(1, FakeController::$wasCalled);
                 $this->assertSame(['id' => 99, 'type' => 'default'], FakeController::$lastArgs);
             } finally {
@@ -392,7 +393,7 @@ final class RouterTest extends TestCase
         $this->expectException(NotFoundControllerException::class);
 
         $this->router->get('/test', 'NonExistentController', 'index');
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -404,7 +405,7 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
 
         $this->router->get('/test', FakeController::class, 'nonExistentMethod');
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -416,7 +417,7 @@ final class RouterTest extends TestCase
         $this->container->set(TypesController::class, fn() => new TypesController());
 
         $this->router->get('/types/{id}', TypesController::class, 'noType');
-        $request = new HttpRequest('/types/5', RequestMethod::GET);
+        $request = new Request('/types/5', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -447,7 +448,7 @@ final class RouterTest extends TestCase
             ->addMiddleware(SecondOrderMiddleware::class)
             ->addMiddleware(ThirdOrderMiddleware::class);
 
-        $request = new HttpRequest('/ordered', RequestMethod::GET);
+        $request = new Request('/ordered', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(['first', 'second', 'third'], OrderTrackingMiddleware::$executionOrder);
@@ -465,7 +466,7 @@ final class RouterTest extends TestCase
         $this->router->get('/with-args', FakeController::class, 'index')
             ->addMiddleware([ArgumentCapturingMiddleware::class, ['arg1', 'arg2', 42]]);
 
-        $request = new HttpRequest('/with-args', RequestMethod::GET);
+        $request = new Request('/with-args', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(1, FakeController::$wasCalled);
@@ -483,7 +484,7 @@ final class RouterTest extends TestCase
         $this->router->get('/bad-middleware', FakeController::class, 'index')
             ->addMiddleware(InvalidMiddleware::class);
 
-        $request = new HttpRequest('/bad-middleware', RequestMethod::GET);
+        $request = new Request('/bad-middleware', RequestMethod::GET);
         $this->router->resolve($request);
     }
 
@@ -501,7 +502,7 @@ final class RouterTest extends TestCase
                 return new CallableTestMiddlewareImpl();
             });
 
-        $request = new HttpRequest('/callable', RequestMethod::GET);
+        $request = new Request('/callable', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame(1, FakeController::$wasCalled);
@@ -518,7 +519,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/api/{version}/users/{id}/posts/{postId}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/api/v1/users/123/posts/456', RequestMethod::GET);
+        $request = new Request('/api/v1/users/123/posts/456', RequestMethod::GET);
 
         try {
             $this->router->resolve($request);
@@ -539,10 +540,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/nullable/{label}/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/nullable/test/1/2.5', RequestMethod::GET);
+        $request = new Request('/nullable/test/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
     }
 
@@ -556,10 +557,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/bool-test/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
-        $request = new HttpRequest('/bool-test/0/1.5', RequestMethod::GET);
+        $request = new Request('/bool-test/0/1.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(false, FakeController::$lastArgs['active']);
         $this->assertSame(1.5, FakeController::$lastArgs['ratio']);
     }
@@ -596,7 +597,7 @@ final class RouterTest extends TestCase
         $this->router->get('/special/endpoint', FakeController::class, 'index');
         $this->router->get('/special/{name}', FakeController::class, 'actionWithParams');
 
-        $exactRequest = new HttpRequest('/special/endpoint', RequestMethod::GET);
+        $exactRequest = new Request('/special/endpoint', RequestMethod::GET);
         $this->router->resolve($exactRequest);
 
         $this->assertSame(1, FakeController::$indexCalls);
@@ -605,7 +606,7 @@ final class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $paramRequest = new HttpRequest('/special/something', RequestMethod::GET);
+        $paramRequest = new Request('/special/something', RequestMethod::GET);
         try {
             $this->router->resolve($paramRequest);
         } catch (MissingRequiredArgumentException) {
@@ -623,10 +624,10 @@ final class RouterTest extends TestCase
         $this->container->set(FakeController::class, fn() => new FakeController());
         $this->router->get('/', FakeController::class, 'index');
 
-        $request = new HttpRequest('/', RequestMethod::GET);
+        $request = new Request('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
     }
 
@@ -641,10 +642,10 @@ final class RouterTest extends TestCase
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'actionWithParams');
 
-        $getRequest = new HttpRequest('/resource', RequestMethod::GET);
+        $getRequest = new Request('/resource', RequestMethod::GET);
         $getResult = $this->router->resolve($getRequest);
 
-        $this->assertInstanceOf(HttpResponse::class, $getResult);
+        $this->assertInstanceOf(TextResponse::class, $getResult);
         $this->assertSame(1, FakeController::$indexCalls);
     }
 
@@ -655,7 +656,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/users', FakeController::class, 'index');
 
-        $request = new HttpRequest('/users', RequestMethod::POST);
+        $request = new Request('/users', RequestMethod::POST);
 
         try {
             $this->router->resolve($request);
@@ -672,7 +673,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
 
-        $request = new HttpRequest('/users/123', RequestMethod::POST);
+        $request = new Request('/users/123', RequestMethod::POST);
 
         try {
             $this->router->resolve($request);
@@ -690,7 +691,7 @@ final class RouterTest extends TestCase
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'index');
 
-        $request = new HttpRequest('/resource', RequestMethod::PUT);
+        $request = new Request('/resource', RequestMethod::PUT);
 
         try {
             $this->router->resolve($request);
@@ -712,7 +713,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/types/{id}', TypesController::class, 'unionType');
 
-        $request = new HttpRequest('/types/5', RequestMethod::GET);
+        $request = new Request('/types/5', RequestMethod::GET);
 
         $this->router->resolve($request);
     }
@@ -726,7 +727,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/types/{value}', TypesController::class, 'intersectionType');
 
-        $request = new HttpRequest('/types/test', RequestMethod::GET);
+        $request = new Request('/types/test', RequestMethod::GET);
 
         $this->router->resolve($request);
     }
@@ -740,7 +741,7 @@ final class RouterTest extends TestCase
 
         $this->router->get('/types/{id}', TypesController::class, 'requiredParameter');
 
-        $request = new HttpRequest('/types/5', RequestMethod::GET);
+        $request = new Request('/types/5', RequestMethod::GET);
 
         $this->router->resolve($request);
     }
@@ -757,10 +758,10 @@ final class RouterTest extends TestCase
 
         $this->router->get('/nullable', NullableController::class, 'index');
 
-        $request = new HttpRequest('/nullable', RequestMethod::GET);
+        $request = new Request('/nullable', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertNull(NullableController::$receivedValue);
     }
 
@@ -780,10 +781,10 @@ final class RouterTest extends TestCase
             'index'
         );
 
-        $request = new HttpRequest('/request/42', RequestMethod::GET);
+        $request = new Request('/request/42', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame([42], RequestParameterController::$receivedArguments);
     }
 
@@ -803,7 +804,7 @@ final class RouterTest extends TestCase
             'index'
         );
 
-        $request = new HttpRequest('/string/123', RequestMethod::GET);
+        $request = new Request('/string/123', RequestMethod::GET);
         $this->router->resolve($request);
 
         $this->assertSame('123', StringParameterController::$receivedValue);
@@ -846,14 +847,14 @@ final class RouterTest extends TestCase
                 $newRouter->loadRoutesFromCache($cacheFile)
             );
 
-            $request = new HttpRequest(
+            $request = new Request(
                 '/cached-registry',
                 RequestMethod::GET
             );
 
             $result = $newRouter->resolve($request);
 
-            $this->assertInstanceOf(HttpResponse::class, $result);
+            $this->assertInstanceOf(TextResponse::class, $result);
             $this->assertSame(1, FakeController::$wasCalled);
         } finally {
             @unlink($registryFile);
@@ -984,14 +985,14 @@ final class RouterTest extends TestCase
             'index'
         );
 
-        $request = new HttpRequest(
+        $request = new Request(
             '/head-fallback',
             RequestMethod::HEAD
         );
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(1, FakeController::$indexCalls);
     }
@@ -1013,14 +1014,14 @@ final class RouterTest extends TestCase
             'actionWithDefaultValue'
         );
 
-        $request = new HttpRequest(
+        $request = new Request(
             '/head-fallback/42',
             RequestMethod::HEAD
         );
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(
             ['id' => 42, 'type' => 'default'],
@@ -1052,14 +1053,14 @@ final class RouterTest extends TestCase
             'head'
         );
 
-        $request = new HttpRequest(
+        $request = new Request(
             '/head-priority',
             RequestMethod::HEAD
         );
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(HttpResponse::class, $result);
+        $this->assertInstanceOf(TextResponse::class, $result);
         $this->assertSame(1, FakeController::$wasCalled);
         $this->assertSame(0, FakeController::$indexCalls);
         $this->assertSame(1, FakeController::$headCalls);
@@ -1081,7 +1082,7 @@ final class RouterTest extends TestCase
 
         $this->expectException(MethodNotAllowedException::class);
 
-        $request = new HttpRequest(
+        $request = new Request(
             '/head-not-allowed',
             RequestMethod::HEAD
         );
@@ -1117,7 +1118,7 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve(
-                new HttpRequest(
+                new Request(
                     '/multi-method/42',
                     RequestMethod::DELETE
                 )
@@ -1145,46 +1146,46 @@ class FakeController
     public static int $headCalls = 0;
     public static array $lastArgs = [];
 
-    public function index(HttpRequest $request): HttpResponse
+    public function index(Request $request): TextResponse
     {
         self::$wasCalled++;
         self::$indexCalls++;
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
-    public function actionWithParams(HttpRequest $request, int $id, int $sth): HttpResponse
+    public function actionWithParams(Request $request, int $id, int $sth): TextResponse
     {
         self::$wasCalled++;
         self::$paramsCalls++;
         self::$lastArgs = ['id' => $id, 'sth' => $sth];
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
-    public function actionWithDefaultValue(HttpRequest $request, int $id, string $type = 'default'): HttpResponse
+    public function actionWithDefaultValue(Request $request, int $id, string $type = 'default'): TextResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['id' => $id, 'type' => $type];
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
-    public function actionWithNullableAndTyped(HttpRequest $request, ?string $label, bool $active, float $ratio): HttpResponse
+    public function actionWithNullableAndTyped(Request $request, ?string $label, bool $active, float $ratio): TextResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['label' => $label, 'active' => $active, 'ratio' => $ratio];
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
-    public function invalidReturnType(HttpRequest $request): string
+    public function invalidReturnType(Request $request): string
     {
         return 'string';
     }
 
-    public function head(HttpRequest $request): HttpResponse
+    public function head(Request $request): TextResponse
     {
         self::$wasCalled++;
         self::$headCalls++;
 
-        return HttpResponse::plainText('head');
+        return new TextResponse('head');
     }
 }
 
@@ -1192,7 +1193,7 @@ class FakeMiddleware implements MiddlewareInterface
 {
     public static int $wasCalled = 0;
 
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         self::$wasCalled++;
         return $next($request);
@@ -1201,42 +1202,42 @@ class FakeMiddleware implements MiddlewareInterface
 
 class StoppingMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
-        return HttpResponse::plainText('hehe', 403);
+        return new TextResponse('hehe', 403);
     }
 }
 
 class TypesController
 {
-    public function noType(HttpRequest $request, $id): HttpResponse
+    public function noType(Request $request, $id): TextResponse
     {
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
     public function unionType(
-        HttpRequest $request,
-        int|string  $id
-    ): HttpResponse
+        Request    $request,
+        int|string $id
+    ): TextResponse
     {
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
     public function intersectionType(
-        HttpRequest                                              $request,
+        Request                                                  $request,
         TypesControllerInterface&AnotherTypesControllerInterface $value
-    ): HttpResponse
+    ): TextResponse
     {
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 
     public function requiredParameter(
-        HttpRequest $request,
-        int         $id,
-        string      $required
-    ): HttpResponse
+        Request $request,
+        int     $id,
+        string  $required
+    ): TextResponse     
     {
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 }
 
@@ -1252,7 +1253,7 @@ class OrderTrackingMiddleware implements MiddlewareInterface
 {
     public static array $executionOrder = [];
 
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         return $next($request);
     }
@@ -1260,7 +1261,7 @@ class OrderTrackingMiddleware implements MiddlewareInterface
 
 class FirstOrderMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         OrderTrackingMiddleware::$executionOrder[] = 'first';
         return $next($request);
@@ -1269,7 +1270,7 @@ class FirstOrderMiddleware implements MiddlewareInterface
 
 class SecondOrderMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         OrderTrackingMiddleware::$executionOrder[] = 'second';
         return $next($request);
@@ -1278,7 +1279,7 @@ class SecondOrderMiddleware implements MiddlewareInterface
 
 class ThirdOrderMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         OrderTrackingMiddleware::$executionOrder[] = 'third';
         return $next($request);
@@ -1289,7 +1290,7 @@ class ArgumentCapturingMiddleware implements MiddlewareInterface
 {
     public static array $capturedArgs = [];
 
-    public function handle(HttpRequest $request, callable $next, ...$args): HttpResponse
+    public function handle(Request $request, callable $next, ...$args): Response
     {
         self::$capturedArgs = $args;
         return $next($request);
@@ -1309,7 +1310,7 @@ class CallableMiddlewareTest
 
 class CallableTestMiddlewareImpl implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): Response
     {
         return $next($request);
     }
@@ -1320,13 +1321,13 @@ class NullableController
     public static mixed $receivedValue = null;
 
     public function index(
-        HttpRequest $request,
-        ?string     $value
-    ): HttpResponse
+        Request $request,
+        ?string $value
+    ): TextResponse
     {
         self::$receivedValue = $value;
 
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 }
 
@@ -1335,13 +1336,13 @@ class RequestParameterController
     public static array $receivedArguments = [];
 
     public function index(
-        HttpRequest $request,
-        int         $id
-    ): HttpResponse
+        Request $request,
+        int     $id
+    ): TextResponse
     {
         self::$receivedArguments = [$id];
 
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 }
 
@@ -1350,12 +1351,12 @@ class StringParameterController
     public static ?string $receivedValue = null;
 
     public function index(
-        HttpRequest $request,
-        string      $value
-    ): HttpResponse
+        Request $request,
+        string  $value
+    ): TextResponse
     {
         self::$receivedValue = $value;
 
-        return HttpResponse::plainText('hehe');
+        return new TextResponse('hehe');
     }
 }

@@ -9,8 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use stdClass;
-use Velo\Http\HttpRequest;
-use Velo\Http\HttpResponse;
+use Velo\Http\Request;
+use Velo\Http\Responses\Concrete\TextResponse;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
@@ -36,11 +36,11 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
 
         $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
-        $this->assertInstanceOf(HttpResponse::class, $response);
+        $this->assertInstanceOf(TextResponse::class, $response);
         $this->assertSame(200, $response->statusCode);
         $this->assertSame(1, $controller->wasCalled);
     }
@@ -52,7 +52,7 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
 
         $route = new Route(RequestMethod::GET, '/users/{id}', PipelineFakeController::class, 'actionWithArgs');
-        $request = new HttpRequest('/users/42', RequestMethod::GET);
+        $request = new Request('/users/42', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [42, 'john']);
 
@@ -75,7 +75,7 @@ final class PipelineTest extends TestCase
         $route->addMiddleware('Middleware1');
         $route->addMiddleware('Middleware2');
 
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
 
         StepMiddleware::$executionOrder = [];
 
@@ -98,7 +98,7 @@ final class PipelineTest extends TestCase
         $route = new Route(RequestMethod::GET, '/admin', PipelineFakeController::class, 'successAction');
         $route->addMiddleware(StoppingPipelineMiddleware::class);
 
-        $request = new HttpRequest('/admin', RequestMethod::GET);
+        $request = new Request('/admin', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
@@ -114,13 +114,13 @@ final class PipelineTest extends TestCase
 
         $directMiddleware = new StepMiddleware('direct');
 
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
         StepMiddleware::$executionOrder = [];
 
         $response = $this->pipeline->executeMiddlewaresChain(
             $request,
             [$directMiddleware],
-            fn(HttpRequest $req) => $controller->successAction($req)
+            fn(Request $req) => $controller->successAction($req)
         );
 
         $this->assertSame(200, $response->statusCode);
@@ -140,7 +140,7 @@ final class PipelineTest extends TestCase
 
         $this->container->set(ModifyingRequestMiddleware::class, $modifyingMiddleware);
 
-        $request = new HttpRequest('/original-path', RequestMethod::GET);
+        $request = new Request('/original-path', RequestMethod::GET);
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
@@ -160,7 +160,7 @@ final class PipelineTest extends TestCase
         $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $route->addMiddleware('InvalidMiddleware');
 
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
 
         $this->expectException(MustImplementMiddlewareInterfaceException::class);
         $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
@@ -173,7 +173,7 @@ final class PipelineTest extends TestCase
         $this->container->set(PipelineFakeController::class, $controller);
 
         $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'invalidAction');
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
 
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
         $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
@@ -189,10 +189,10 @@ final class PipelineTest extends TestCase
         $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $route->addMiddleware([MiddlewareWithArgs::class, ['hehe', 'hihi']]);
 
-        $request = new HttpRequest('/test', RequestMethod::GET);
+        $request = new Request('/test', RequestMethod::GET);
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
-        $this->assertEquals(HttpResponse::plainText('content'), $response);
+        $this->assertEquals(new TextResponse('content'), $response);
     }
 
     #[Test]
@@ -206,9 +206,9 @@ final class PipelineTest extends TestCase
         StepMiddleware::$executionOrder = [];
 
         $response = $this->pipeline->executeMiddlewaresChain(
-            new HttpRequest('/test', RequestMethod::GET),
+            new Request('/test', RequestMethod::GET),
             [$factory],
-            fn(HttpRequest $req) => $controller->successAction($req)
+            fn(Request $req) => $controller->successAction($req)
         );
 
         $this->assertSame(200, $response->statusCode);
@@ -248,33 +248,33 @@ class PipelineFakeController
 {
     public int $wasCalled = 0;
     public array $lastArgs = [];
-    public ?HttpRequest $lastReceivedRequest = null;
+    public ?Request $lastReceivedRequest = null;
 
-    public function successAction(HttpRequest $request): HttpResponse
+    public function successAction(Request $request): TextResponse
     {
         $this->wasCalled++;
         $this->lastReceivedRequest = $request;
-        return HttpResponse::plainText('content');
+        return new TextResponse('content');
     }
 
-    public function actionWithArgs(HttpRequest $request, int $id, string $name): HttpResponse
+    public function actionWithArgs(Request $request, int $id, string $name): TextResponse
     {
         $this->wasCalled++;
         $this->lastArgs = [$id, $name];
         $this->lastReceivedRequest = $request;
-        return HttpResponse::plainText('content');
+        return new TextResponse('content');
     }
 
-    public function actionCapturingRequest(HttpRequest $request): HttpResponse
+    public function actionCapturingRequest(Request $request): TextResponse
     {
         $this->wasCalled++;
         $this->lastReceivedRequest = $request;
-        return HttpResponse::plainText('content');
+        return new TextResponse('content');
     }
 
-    public function invalidAction(HttpRequest $request): string
+    public function invalidAction(Request $request): string
     {
-        return 'Not an HttpResponse instance';
+        return 'Not an TextResponse instance';
     }
 }
 
@@ -286,7 +286,7 @@ class StepMiddleware implements MiddlewareInterface
     {
     }
 
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): TextResponse
     {
         self::$executionOrder[] = $this->name;
         return $next($request);
@@ -295,29 +295,29 @@ class StepMiddleware implements MiddlewareInterface
 
 class ModifyingRequestMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): TextResponse
     {
-        $modifiedRequest = new HttpRequest('/modified-path', $request->method);
+        $modifiedRequest = new Request('/modified-path', $request->method);
         return $next($modifiedRequest);
     }
 }
 
 class MiddlewareWithArgs implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next, string $arg1 = '', string $arg2 = ''): HttpResponse
+    public function handle(Request $request, callable $next, string $arg1 = '', string $arg2 = ''): TextResponse
     {
         if ($arg1 === 'hehe' && $arg2 === 'hihi') {
             return $next($request);
         }
 
-        return HttpResponse::plainText('Internal Server Error', 500);
+        return new TextResponse('Internal Server Error', 500);
     }
 }
 
 class StoppingPipelineMiddleware implements MiddlewareInterface
 {
-    public function handle(HttpRequest $request, callable $next): HttpResponse
+    public function handle(Request $request, callable $next): TextResponse
     {
-        return HttpResponse::plainText('Forbidden', 403);
+        return new TextResponse('Forbidden', 403);
     }
 }

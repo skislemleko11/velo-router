@@ -6,8 +6,8 @@ namespace Velo\Router\Pipeline;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use Velo\Http\HttpRequest;
-use Velo\Http\HttpResponse;
+use Velo\Http\Request;
+use Velo\Http\Responses\Response;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
@@ -27,12 +27,11 @@ readonly class Pipeline
      * Main, universal method running the given chain of middlewares. Used for the global pipeline.
      *
      * @param list<MiddlewareInterface|string|array{0: string, 1?: list<mixed>}|callable> $middlewares
+     * If it's a callable, it must return an instance of MiddlewareInterface - it must be a factory function.
      * @throws ContainerExceptionInterface
      * @throws MustImplementMiddlewareInterfaceException
-     * @throws NotFoundExceptionInterface
-     * @throws MiddlewareNotFoundException
      */
-    public function executeMiddlewaresChain(HttpRequest $request, array $middlewares, callable $destination): HttpResponse
+    public function executeMiddlewaresChain(Request $request, array $middlewares, callable $destination): Response
     {
         $index = 0;
 
@@ -42,37 +41,14 @@ readonly class Pipeline
          * @throws MustImplementMiddlewareInterfaceException
          * @throws MiddlewareNotFoundException
          */
-        $next = function (HttpRequest $request) use (&$index, &$middlewares, $destination, &$next) {
+        $next = function (Request $request) use (&$index, $middlewares, $destination, &$next) {
             if ($index >= count($middlewares)) {
                 return $destination($request);
             }
 
-            $middleware = $middlewares[$index];
+            [$middlewareInstance, $arguments] = $this->getMiddlewareInstanceAndArguments($middlewares[$index]);
+
             $index++;
-
-            $arguments = [];
-
-            if ($middleware instanceof MiddlewareInterface) {
-                $middlewareInstance = $middleware;
-            } elseif (is_array($middleware)) {
-                $middlewareClass = $middleware[0];
-                $arguments = $middleware[1] ?? [];
-                $middlewareInstance = $this->container->get($middlewareClass);
-            } elseif (is_string($middleware)) {
-                $middlewareInstance = $this->container->get($middleware);
-            } elseif (is_callable($middleware)) {
-                $middlewareInstance = $middleware();
-            } else {
-                throw new MustImplementMiddlewareInterfaceException(
-                    'Middleware must implement ' . MiddlewareInterface::class
-                );
-            }
-
-            if (!$middlewareInstance instanceof MiddlewareInterface) {
-                throw new MustImplementMiddlewareInterfaceException(
-                    'Class ' . $middlewareInstance::class . ' must implement ' . MiddlewareInterface::class . '!'
-                );
-            }
 
             return $middlewareInstance->handle($request, $next, ...$arguments);
         };
@@ -81,38 +57,73 @@ readonly class Pipeline
     }
 
     /**
+     * @param MiddlewareInterface|string|array{0: string, 1?: list<mixed>}|callable $middleware
+     * If it's a callable, it must return an instance of MiddlewareInterface - it must be a factory function.
+     *
+     * @return array{0: MiddlewareInterface, 1: list<mixed>} a Middleware instance and an array of arguments.
+     * @throws MustImplementMiddlewareInterfaceException
+     *
+     * @throws ContainerExceptionInterface
+     */
+    private function getMiddlewareInstanceAndArguments(mixed $middleware): array
+    {
+        $arguments = [];
+
+        if ($middleware instanceof MiddlewareInterface) {
+            $middlewareInstance = $middleware;
+        } elseif (is_array($middleware)) {
+            $middlewareClass = $middleware[0];
+            $arguments = $middleware[1] ?? [];
+            $middlewareInstance = $this->container->get($middlewareClass);
+        } elseif (is_string($middleware)) {
+            $middlewareInstance = $this->container->get($middleware);
+        } elseif (is_callable($middleware)) {
+            $middlewareInstance = $middleware();
+        } else {
+            throw new MustImplementMiddlewareInterfaceException(
+                'Middleware must implement ' . MiddlewareInterface::class
+            );
+        }
+
+        if (!$middlewareInstance instanceof MiddlewareInterface) {
+            throw new MustImplementMiddlewareInterfaceException(
+                'Class ' . $middlewareInstance::class . ' must implement ' . MiddlewareInterface::class . '!'
+            );
+        }
+
+        return [$middlewareInstance, $arguments];
+    }
+
+    /**
      * Method dedicated for Routes' middlewares. It uses the main method.
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
-     * @throws MiddlewareNotFoundException
      * @throws MustImplementMiddlewareInterfaceException
-     * @throws NotFoundExceptionInterface
      */
-    public function executeRoutesMiddlewaresChain(Route $route, HttpRequest $request, array $castedArgs): HttpResponse
+    public function executeRoutesMiddlewaresChain(Route $route, Request $request, array $castedArgs): Response
     {
         $middlewares = $route->getMiddlewares();
-        $destination = fn(HttpRequest $req) => $this->coreAction($route, $req, $castedArgs);
+        $destination = fn(Request $req) => $this->executeControllerAction($route, $req, $castedArgs);
 
         return $this->executeMiddlewaresChain($request, $middlewares, $destination);
     }
 
     /**
-     * It executes the core action of the given route's controller.
+     * Executes the action of the given route's controller.
      *
      * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      */
-    private function coreAction(Route $route, HttpRequest $request, array $castedArgs): HttpResponse
+    private function executeControllerAction(Route $route, Request $request, array $castedArgs): Response
     {
         $controllerInstance = $this->container->get($route->controller);
         $result = $controllerInstance->{$route->action}($request, ...$castedArgs);
 
-        if (!$result instanceof HttpResponse) {
+        if (!$result instanceof Response) {
             throw new ControllerMethodInvalidReturnTypeException(
                 'Invalid return type of controller ' . $controllerInstance::class .
-                ' function! It must be ' . HttpResponse::class
+                ' function! It must extend ' . Response::class . '.'
             );
         }
 
