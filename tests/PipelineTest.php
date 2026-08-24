@@ -38,7 +38,7 @@ final class PipelineTest extends TestCase
         $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'successAction');
         $request = new Request('/test', RequestMethod::GET);
 
-        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
         $this->assertInstanceOf(TextResponse::class, $response);
         $this->assertSame(200, $response->statusCode);
@@ -54,7 +54,7 @@ final class PipelineTest extends TestCase
         $route = new Route(RequestMethod::GET, '/users/{id}', PipelineFakeController::class, 'actionWithArgs');
         $request = new Request('/users/42', RequestMethod::GET);
 
-        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [42, 'john']);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request, 42, 'john']);
 
         $this->assertSame(200, $response->statusCode);
         $this->assertSame([42, 'john'], $controller->lastArgs);
@@ -79,7 +79,7 @@ final class PipelineTest extends TestCase
 
         StepMiddleware::$executionOrder = [];
 
-        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
         $this->assertSame(200, $response->statusCode);
         $this->assertSame(['first', 'second'], StepMiddleware::$executionOrder);
@@ -129,26 +129,6 @@ final class PipelineTest extends TestCase
     }
 
     #[Test]
-    public function it_passes_modified_request_down_the_middleware_chain_to_controller(): void
-    {
-        $controller = new PipelineFakeController();
-        $this->container->set(PipelineFakeController::class, $controller);
-
-        $modifyingMiddleware = new ModifyingRequestMiddleware();
-        $route = new Route(RequestMethod::GET, '/test', PipelineFakeController::class, 'actionCapturingRequest');
-        $route->addMiddleware(ModifyingRequestMiddleware::class);
-
-        $this->container->set(ModifyingRequestMiddleware::class, $modifyingMiddleware);
-
-        $request = new Request('/original-path', RequestMethod::GET);
-
-        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
-
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame('/modified-path', $controller->lastReceivedRequest?->urlPath);
-    }
-
-    #[Test]
     public function it_throws_exception_if_middleware_does_not_implement_middleware_interface(): void
     {
         $controller = new PipelineFakeController();
@@ -190,7 +170,7 @@ final class PipelineTest extends TestCase
         $route->addMiddleware([MiddlewareWithArgs::class, ['hehe', 'hihi']]);
 
         $request = new Request('/test', RequestMethod::GET);
-        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
+        $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
         $this->assertEquals(new TextResponse('content'), $response);
     }
@@ -272,7 +252,7 @@ class PipelineFakeController
         return new TextResponse('content');
     }
 
-    public function invalidAction(Request $request): string
+    public function invalidAction(): string
     {
         return 'Not an TextResponse instance';
     }

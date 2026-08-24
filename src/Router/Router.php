@@ -278,7 +278,12 @@ class Router
             throw new NotFoundControllerMethodException("The requested method: $route->controller::$route->action was not found.");
         }
 
-        $castedArgs = $this->castMethodsArgs($route->controller, $route->action, $getMethodArgs);
+        $castedArgs = $this->castMethodsArgsAndAddRequestToThemIfNeeded(
+            className:  $route->controller,
+            methodName: $route->action,
+            args: $getMethodArgs,
+            request: $request
+        );
 
         return $this->pipeline->executeRoutesMiddlewaresChain($route, $request, $castedArgs);
     }
@@ -293,7 +298,12 @@ class Router
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
      */
-    private function castMethodsArgs(string $className, string $methodName, array $args): array
+    private function castMethodsArgsAndAddRequestToThemIfNeeded(
+        string  $className,
+        string  $methodName,
+        array   $args,
+        Request $request
+    ): array
     {
         $reflection = new ReflectionMethod($className, $methodName);
         $reflectionParams = $reflection->getParameters();
@@ -312,10 +322,8 @@ class Router
 
             if ($paramType instanceof ReflectionNamedType) {
                 if ($paramType->getName() === Request::class) {
-                    continue;
-                }
-
-                if (isset($args[$paramName])) {
+                    $castedArgs[] = $request;
+                } elseif (isset($args[$paramName])) {
                     $value = $args[$paramName];
 
                     if ($paramType->isBuiltin()) {
@@ -402,6 +410,7 @@ class Router
     }
 
     // TODO: IT'S NOT A VERY SAFE SOLUTION, SECURE IT SOON!
+
     /**
      * Loads a Routes Registry File. It's meant to be a file where Routes are registered using Router methods.
      *

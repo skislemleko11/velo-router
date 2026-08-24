@@ -104,7 +104,7 @@ readonly class Pipeline
     public function executeRoutesMiddlewaresChain(Route $route, Request $request, array $castedArgs): Response
     {
         $middlewares = $route->getMiddlewares();
-        $destination = fn(Request $req) => $this->executeControllerAction($route, $req, $castedArgs);
+        $destination = fn() => $this->executeControllerAction($route, $castedArgs);
 
         return $this->executeMiddlewaresChain($request, $middlewares, $destination);
     }
@@ -115,10 +115,10 @@ readonly class Pipeline
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      */
-    private function executeControllerAction(Route $route, Request $request, array $castedArgs): Response
+    private function executeControllerAction(Route $route, array $castedArgs): Response
     {
         $controllerInstance = $this->container->get($route->controller);
-        $result = $controllerInstance->{$route->action}($request, ...$castedArgs);
+        $result = $controllerInstance->{$route->action}(...$castedArgs);
 
         if (!$result instanceof Response) {
             throw new ControllerMethodInvalidReturnTypeException(
