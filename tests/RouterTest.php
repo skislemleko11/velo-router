@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Velo\Router\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -54,27 +55,42 @@ final class RouterTest extends TestCase
     }
 
     #[Test]
-    public function it_registers_a_get_route(): void
+    #[DataProvider('routesRegisterDataProvider')]
+    public function it_registers_routes(string $method, ?string $action): void
     {
-        $route = $this->router->get('/users', 'UserController', 'index');
+        if ($action) {
+            $route = $this->router->{$method}('/users', 'UserController', $action);
+        } else {
+            $route = $this->router->{$method}('/users', 'UserController');
+        }
 
         $this->assertInstanceOf(Route::class, $route);
-        $this->assertSame(RequestMethod::GET, $route->requestMethod);
+        $this->assertInstanceOf(Route::class, $route);
+        $this->assertSame(RequestMethod::fromString($method), $route->requestMethod);
         $this->assertSame('/users', $route->path);
         $this->assertSame('UserController', $route->controller);
-        $this->assertSame('index', $route->action);
-
-        $this->assertSame($route, $this->getRoutesProperty($this->router)[RequestMethod::GET->value]['/users']);
+        $this->assertSame($action ?? '__invoke', $route->action);
     }
 
-    #[Test]
-    public function it_registers_a_post_route(): void
+    public static function routesRegisterDataProvider(): array
     {
-        $route = $this->router->post('/users', 'UserController', 'create');
+        return [
+            ['get', 'a'],
+            ['get', null],
+            ['post', 'a'],
+            ['post', null],
+            ['patch', 'a'],
+            ['patch', null],
+            ['put', 'a'],
+            ['put', null],
+            ['delete', 'a'],
+            ['delete', null],
+            ['head', 'a'],
+            ['head', null],
+            ['options', 'a'],
+            ['options', null],
+        ];
 
-        $this->assertInstanceOf(Route::class, $route);
-        $this->assertSame(RequestMethod::POST, $route->requestMethod);
-        $this->assertSame($route, $this->getRoutesProperty($this->router)[RequestMethod::POST->value]['/users']);
     }
 
     #[Test]
@@ -1136,6 +1152,11 @@ final class RouterTest extends TestCase
             );
         }
     }
+
+    public function it_registers()
+    {
+
+    }
 }
 
 class FakeController
@@ -1235,7 +1256,7 @@ class TypesController
         Request $request,
         int     $id,
         string  $required
-    ): TextResponse     
+    ): TextResponse
     {
         return new TextResponse('hehe');
     }

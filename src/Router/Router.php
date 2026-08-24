@@ -50,7 +50,7 @@ class Router
     /**
      * Registers Route with GET method.
      */
-    public function get(string $path, string $controller, string $action): Route
+    public function get(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::GET, $path, $controller, $action);
     }
@@ -58,7 +58,7 @@ class Router
     /**
      * Registers Route with POST method.
      */
-    public function post(string $path, string $controller, string $action): Route
+    public function post(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::POST, $path, $controller, $action);
     }
@@ -66,7 +66,7 @@ class Router
     /**
      * Registers Route with PUT method.
      */
-    public function put(string $path, string $controller, string $action): Route
+    public function put(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::PUT, $path, $controller, $action);
     }
@@ -74,7 +74,7 @@ class Router
     /**
      * Registers Route with PATCH method.
      */
-    public function patch(string $path, string $controller, string $action): Route
+    public function patch(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::PATCH, $path, $controller, $action);
     }
@@ -82,7 +82,7 @@ class Router
     /**
      * Registers Route with DELETE method.
      */
-    public function delete(string $path, string $controller, string $action): Route
+    public function delete(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::DELETE, $path, $controller, $action);
     }
@@ -90,7 +90,7 @@ class Router
     /**
      * Registers Route with QUERY method.
      */
-    public function query(string $path, string $controller, string $action): Route
+    public function query(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::QUERY, $path, $controller, $action);
     }
@@ -98,7 +98,7 @@ class Router
     /**
      * Registers Route with HEAD method.
      */
-    public function head(string $path, string $controller, string $action): Route
+    public function head(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::HEAD, $path, $controller, $action);
     }
@@ -106,15 +106,17 @@ class Router
     /**
      * Registers Route with OPTIONS method.
      */
-    public function options(string $path, string $controller, string $action): Route
+    public function options(string $path, string $controller, string $action = '__invoke'): Route
     {
         return $this->registerRoute(RequestMethod::OPTIONS, $path, $controller, $action);
     }
 
-    /**
-     * Registers a Route with the given method.
-     */
-    private function registerRoute(RequestMethod $requestMethod, string $path, string $controller, string $action): Route
+    private function registerRoute(
+        RequestMethod $requestMethod,
+        string        $path,
+        string        $controller,
+        string        $action
+    ): Route
     {
         $route = new Route($requestMethod, $path, $controller, $action);
         $this->routes[$requestMethod->value][$path] = $route;
@@ -279,7 +281,7 @@ class Router
         }
 
         $castedArgs = $this->castMethodsArgsAndAddRequestToThemIfNeeded(
-            className:  $route->controller,
+            className: $route->controller,
             methodName: $route->action,
             args: $getMethodArgs,
             request: $request
