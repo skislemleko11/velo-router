@@ -15,7 +15,9 @@ trait AddMiddlewaresTrait
 
     /**
      * @param string|array|MiddlewareInterface{0: string, 1?: list<mixed>}|callable $middleware
-     * Middleware class name or an array of binded ID and array of args or callable - facory function which must return an instance of MiddlewareInterface.
+     * Middleware class name/ID binded in the DI Container or an array of class name/ID binded in the DI Container
+     * and array of args which will be passed to the 'handle' middleware's method,
+     * or callable - facory function which must return an instance of MiddlewareInterface.
      * Passing an already instanciated object is also possible, but not recommended.
      * Passing a factory callable is possible as well, but it's not recommended either,
      * because it will cause errors with caching Routes in Router class.
@@ -30,12 +32,13 @@ trait AddMiddlewaresTrait
 
     /**
      * @param string|array|MiddlewareInterface{0: string, 1?: list<mixed>}|callable ...$middlewares
-     * Some: Middleware class name or an array of binded ID and array of args or callable - facory function which must return an instance of MiddlewareInterface..
+     * Middleware class name/ID binded in the DI Container or an array of class name/ID binded in the DI Container
+     * and array of args which will be passed to the 'handle' middleware's method,
+     * or callable - facory function which must return an instance of MiddlewareInterface.
      * Passing an already instanciated object is also possible, but not recommended.
      * Passing a factory callable is possible as well, but it's not recommended either,
      * because it will cause errors with caching Routes in Router class.
      * Use already instanciated objects and callables only for tests and development usage.
-     * Pass every middleware after a comma.
      */
     public function addMiddlewares(string|array|MiddlewareInterface|callable ...$middlewares): self
     {

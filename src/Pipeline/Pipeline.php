@@ -28,6 +28,7 @@ readonly class Pipeline
      *
      * @param list<MiddlewareInterface|string|array{0: string, 1?: list<mixed>}|callable> $middlewares
      * If it's a callable, it must return an instance of MiddlewareInterface - it must be a factory function.
+     *
      * @throws ContainerExceptionInterface
      * @throws MustImplementMiddlewareInterfaceException
      */
@@ -61,8 +62,8 @@ readonly class Pipeline
      * If it's a callable, it must return an instance of MiddlewareInterface - it must be a factory function.
      *
      * @return array{0: MiddlewareInterface, 1: list<mixed>} a Middleware instance and an array of arguments.
-     * @throws MustImplementMiddlewareInterfaceException
      *
+     * @throws MustImplementMiddlewareInterfaceException
      * @throws ContainerExceptionInterface
      */
     private function getMiddlewareInstanceAndArguments(mixed $middleware): array
