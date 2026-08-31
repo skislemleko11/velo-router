@@ -28,8 +28,8 @@ final class RouteTest extends TestCase
     public function it_sets_middleware_and_returns_self(): void
     {
         $self = $this->route->addMiddleware('middleware');
-        $this->assertSame(['middleware'], $this->getMiddlewaresProperty());
-        $this->assertSame($this->route, $self);
+        self::assertSame(['middleware'], $this->getMiddlewaresProperty());
+        self::assertSame($this->route, $self);
     }
 
     #[Test]
@@ -43,39 +43,39 @@ final class RouteTest extends TestCase
             '#^/custom/(?P<id>\d+)$#'
         );
 
-        $this->assertSame('#^/custom/(?P<id>\d+)$#', $route->compiledRegex);
+        self::assertSame('#^/custom/(?P<id>\d+)$#', $route->compiledRegex);
     }
 
     #[Test]
     public function it_sets_middleware_with_params_and_returns_self(): void
     {
         $self = $this->route->addMiddleware(['middleware', ['param1', 'param2']]);
-        $this->assertSame([['middleware', ['param1', 'param2']]], $this->getMiddlewaresProperty());
-        $this->assertSame($this->route, $self);
+        self::assertSame([['middleware', ['param1', 'param2']]], $this->getMiddlewaresProperty());
+        self::assertSame($this->route, $self);
     }
 
     #[Test]
     public function it_sets_multiple_middlewares_and_returns_self(): void
     {
         $self = $this->route->addMiddlewares(['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]);
-        $this->assertSame(
+        self::assertSame(
             [['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]],
             $this->getMiddlewaresProperty()
         );
-        $this->assertSame($this->route, $self);
+        self::assertSame($this->route, $self);
     }
 
     #[Test]
     public function it_gets_middleware_and_returns_null(): void
     {
-        $this->assertNull($this->route->getMiddleware(1));
+        self::assertNull($this->route->getMiddleware(1));
     }
 
     #[Test]
     public function it_gets_middleware_and_returns_value(): void
     {
         $this->route->addMiddleware('middleware');
-        $this->assertSame('middleware', $this->route->getMiddleware(0));
+        self::assertSame('middleware', $this->route->getMiddleware(0));
     }
 
     #[Test]
@@ -85,7 +85,7 @@ final class RouteTest extends TestCase
         foreach ($middlewares as $middleware) {
             $this->route->addMiddleware($middleware);
         }
-        $this->assertSame(count($middlewares), $this->route->getMiddlewaresCount());
+        self::assertSame(count($middlewares), $this->route->getMiddlewaresCount());
     }
 
     #[Test]
@@ -103,15 +103,15 @@ final class RouteTest extends TestCase
         /** @var Route $restoredRoute */
         $restoredRoute = eval('return ' . var_export($route, true) . ';');
 
-        $this->assertInstanceOf(Route::class, $restoredRoute);
-        $this->assertSame(RequestMethod::POST, $restoredRoute->requestMethod);
-        $this->assertSame('/articles/{slug}', $restoredRoute->path);
-        $this->assertSame('ArticleController', $restoredRoute->controller);
-        $this->assertSame('show', $restoredRoute->action);
-        $this->assertSame('#^/articles/(?P<slug>[a-z0-9-]+)$#', $restoredRoute->compiledRegex);
-        $this->assertSame('auth', $restoredRoute->getMiddleware(0));
-        $this->assertSame(['rate-limit', ['60']], $restoredRoute->getMiddleware(1));
-        $this->assertSame(2, $restoredRoute->getMiddlewaresCount());
+        self::assertInstanceOf(Route::class, $restoredRoute);
+        self::assertSame(RequestMethod::POST, $restoredRoute->requestMethod);
+        self::assertSame('/articles/{slug}', $restoredRoute->path);
+        self::assertSame('ArticleController', $restoredRoute->controller);
+        self::assertSame('show', $restoredRoute->action);
+        self::assertSame('#^/articles/(?P<slug>[a-z0-9-]+)$#', $restoredRoute->compiledRegex);
+        self::assertSame('auth', $restoredRoute->getMiddleware(0));
+        self::assertSame(['rate-limit', ['60']], $restoredRoute->getMiddleware(1));
+        self::assertSame(2, $restoredRoute->getMiddlewaresCount());
     }
 
     public static function middlewaresCountDataProvider(): array

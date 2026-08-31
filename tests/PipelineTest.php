@@ -40,9 +40,9 @@ final class PipelineTest extends TestCase
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
-        $this->assertInstanceOf(TextResponse::class, $response);
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame(1, $controller->wasCalled);
+        self::assertInstanceOf(TextResponse::class, $response);
+        self::assertSame(200, $response->statusCode);
+        self::assertSame(1, $controller->wasCalled);
     }
 
     #[Test]
@@ -56,8 +56,8 @@ final class PipelineTest extends TestCase
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request, 42, 'john']);
 
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame([42, 'john'], $controller->lastArgs);
+        self::assertSame(200, $response->statusCode);
+        self::assertSame([42, 'john'], $controller->lastArgs);
     }
 
     #[Test]
@@ -81,9 +81,9 @@ final class PipelineTest extends TestCase
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame(['first', 'second'], StepMiddleware::$executionOrder);
-        $this->assertSame(1, $controller->wasCalled);
+        self::assertSame(200, $response->statusCode);
+        self::assertSame(['first', 'second'], StepMiddleware::$executionOrder);
+        self::assertSame(1, $controller->wasCalled);
     }
 
     #[Test]
@@ -102,8 +102,8 @@ final class PipelineTest extends TestCase
 
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, []);
 
-        $this->assertSame(403, $response->statusCode);
-        $this->assertSame(0, $controller->wasCalled);
+        self::assertSame(403, $response->statusCode);
+        self::assertSame(0, $controller->wasCalled);
     }
 
     #[Test]
@@ -123,9 +123,9 @@ final class PipelineTest extends TestCase
             fn(Request $req) => $controller->successAction($req)
         );
 
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame(['direct'], StepMiddleware::$executionOrder);
-        $this->assertSame(1, $controller->wasCalled);
+        self::assertSame(200, $response->statusCode);
+        self::assertSame(['direct'], StepMiddleware::$executionOrder);
+        self::assertSame(1, $controller->wasCalled);
     }
 
     #[Test]
@@ -172,7 +172,7 @@ final class PipelineTest extends TestCase
         $request = new Request('/test', RequestMethod::GET);
         $response = $this->pipeline->executeRoutesMiddlewaresChain($route, $request, [$request]);
 
-        $this->assertEquals(new TextResponse('content'), $response);
+        self::assertEquals(new TextResponse('content'), $response);
     }
 
     #[Test]
@@ -191,8 +191,8 @@ final class PipelineTest extends TestCase
             fn(Request $req) => $controller->successAction($req)
         );
 
-        $this->assertSame(200, $response->statusCode);
-        $this->assertSame(['from_factory'], StepMiddleware::$executionOrder);
+        self::assertSame(200, $response->statusCode);
+        self::assertSame(['from_factory'], StepMiddleware::$executionOrder);
     }
 }
 

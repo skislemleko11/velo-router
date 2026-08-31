@@ -64,12 +64,12 @@ final class RouterTest extends TestCase
             $route = $this->router->{$method}('/users', 'UserController');
         }
 
-        $this->assertInstanceOf(Route::class, $route);
-        $this->assertInstanceOf(Route::class, $route);
-        $this->assertSame(RequestMethod::fromString($method), $route->requestMethod);
-        $this->assertSame('/users', $route->path);
-        $this->assertSame('UserController', $route->controller);
-        $this->assertSame($action ?? '__invoke', $route->action);
+        self::assertInstanceOf(Route::class, $route);
+        self::assertInstanceOf(Route::class, $route);
+        self::assertSame(RequestMethod::fromString($method), $route->requestMethod);
+        self::assertSame('/users', $route->path);
+        self::assertSame('UserController', $route->controller);
+        self::assertSame($action ?? '__invoke', $route->action);
     }
 
     public static function routesRegisterDataProvider(): array
@@ -103,8 +103,8 @@ final class RouterTest extends TestCase
         $request = new Request('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
     }
 
     #[Test]
@@ -122,9 +122,9 @@ final class RouterTest extends TestCase
         $request = new Request('/users/me', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$indexCalls);
-        $this->assertSame(0, FakeController::$paramsCalls);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$indexCalls);
+        self::assertSame(0, FakeController::$paramsCalls);
     }
 
     #[Test]
@@ -138,10 +138,10 @@ final class RouterTest extends TestCase
         $request = new Request('/users/5/100', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(5, FakeController::$lastArgs['id']);
-        $this->assertSame(100, FakeController::$lastArgs['sth']);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(5, FakeController::$lastArgs['id']);
+        self::assertSame(100, FakeController::$lastArgs['sth']);
     }
 
     #[Test]
@@ -156,9 +156,9 @@ final class RouterTest extends TestCase
         $request = new Request('/flags/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(['label' => null, 'active' => true, 'ratio' => 2.5], FakeController::$lastArgs);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(['label' => null, 'active' => true, 'ratio' => 2.5], FakeController::$lastArgs);
     }
 
     #[Test]
@@ -173,9 +173,9 @@ final class RouterTest extends TestCase
         $request = new Request('/reports/7', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(['id' => 7, 'type' => 'default'], FakeController::$lastArgs);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(['id' => 7, 'type' => 'default'], FakeController::$lastArgs);
     }
 
     #[Test]
@@ -216,8 +216,8 @@ final class RouterTest extends TestCase
             ->addMiddleware('SomeMiddleware')
             ->addMiddleware('AnotherMiddleware');
 
-        $this->assertSame('SomeMiddleware', $route->getMiddleware(0));
-        $this->assertSame('AnotherMiddleware', $route->getMiddleware(1));
+        self::assertSame('SomeMiddleware', $route->getMiddleware(0));
+        self::assertSame('AnotherMiddleware', $route->getMiddleware(1));
     }
 
     #[Test]
@@ -235,9 +235,9 @@ final class RouterTest extends TestCase
         $request = new Request('/dashboard', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeMiddleware::$wasCalled);
-        $this->assertSame(1, FakeController::$wasCalled);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeMiddleware::$wasCalled);
+        self::assertSame(1, FakeController::$wasCalled);
     }
 
     #[Test]
@@ -254,9 +254,9 @@ final class RouterTest extends TestCase
         $request = new Request('/protected', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(403, $result->statusCode);
-        $this->assertSame(0, FakeController::$wasCalled);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(403, $result->statusCode);
+        self::assertSame(0, FakeController::$wasCalled);
     }
 
     #[Test]
@@ -264,7 +264,7 @@ final class RouterTest extends TestCase
     {
         $missingFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'velo-router-missing-' . uniqid('', true) . '.php';
 
-        $this->assertFalse($this->router->loadRoutesFromCache($missingFile));
+        self::assertFalse($this->router->loadRoutesFromCache($missingFile));
     }
 
     #[Test]
@@ -286,20 +286,20 @@ final class RouterTest extends TestCase
         try {
             $this->router->cacheRoutes($cacheFile);
 
-            $this->assertFileExists($cacheFile);
-            $this->assertStringContainsString('FakeController', (string)file_get_contents($cacheFile));
-            $this->assertStringContainsString('FakeMiddleware', (string)file_get_contents($cacheFile));
+            self::assertFileExists($cacheFile);
+            self::assertStringContainsString('FakeController', (string)file_get_contents($cacheFile));
+            self::assertStringContainsString('FakeMiddleware', (string)file_get_contents($cacheFile));
 
             $cachedRouter = new Router($this->pipeline);
-            $this->assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
+            self::assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
 
             $request = new Request('/cached/42', RequestMethod::GET);
             $result = $cachedRouter->resolve($request);
 
-            $this->assertInstanceOf(TextResponse::class, $result);
-            $this->assertSame(1, FakeMiddleware::$wasCalled);
-            $this->assertSame(1, FakeController::$wasCalled);
-            $this->assertSame(['id' => 42, 'type' => 'default'], FakeController::$lastArgs);
+            self::assertInstanceOf(TextResponse::class, $result);
+            self::assertSame(1, FakeMiddleware::$wasCalled);
+            self::assertSame(1, FakeController::$wasCalled);
+            self::assertSame(['id' => 42, 'type' => 'default'], FakeController::$lastArgs);
         } finally {
             @unlink($cacheFile);
         }
@@ -349,8 +349,8 @@ final class RouterTest extends TestCase
             $request = new Request('/registry', RequestMethod::GET);
             $result = $newRouter->resolve($request);
 
-            $this->assertInstanceOf(TextResponse::class, $result);
-            $this->assertSame(1, FakeController::$wasCalled);
+            self::assertInstanceOf(TextResponse::class, $result);
+            self::assertSame(1, FakeController::$wasCalled);
         } finally {
             @unlink($registryFile);
             @unlink($cacheFile ?? '');
@@ -385,9 +385,9 @@ final class RouterTest extends TestCase
                 $request = new Request('/cached-test/99', RequestMethod::GET);
                 $result = $newRouter->resolve($request);
 
-                $this->assertInstanceOf(TextResponse::class, $result);
-                $this->assertSame(1, FakeController::$wasCalled);
-                $this->assertSame(['id' => 99, 'type' => 'default'], FakeController::$lastArgs);
+                self::assertInstanceOf(TextResponse::class, $result);
+                self::assertSame(1, FakeController::$wasCalled);
+                self::assertSame(['id' => 99, 'type' => 'default'], FakeController::$lastArgs);
             } finally {
                 @unlink($registryFile);
             }
@@ -400,7 +400,7 @@ final class RouterTest extends TestCase
     public function it_returns_false_when_loading_routes_from_missing_registry_file(): void
     {
         $missingFile = sys_get_temp_dir() . '/velo-missing-registry-' . uniqid() . '.php';
-        $this->assertFalse($this->router->loadRoutesFromRegistryFile($missingFile));
+        self::assertFalse($this->router->loadRoutesFromRegistryFile($missingFile));
     }
 
     #[Test]
@@ -443,10 +443,10 @@ final class RouterTest extends TestCase
         $route = $this->router->get('/admin', FakeController::class, 'index')
             ->addMiddlewares('Middleware1', 'Middleware2', 'Middleware3');
 
-        $this->assertSame('Middleware1', $route->getMiddleware(0));
-        $this->assertSame('Middleware2', $route->getMiddleware(1));
-        $this->assertSame('Middleware3', $route->getMiddleware(2));
-        $this->assertSame(3, $route->getMiddlewaresCount());
+        self::assertSame('Middleware1', $route->getMiddleware(0));
+        self::assertSame('Middleware2', $route->getMiddleware(1));
+        self::assertSame('Middleware3', $route->getMiddleware(2));
+        self::assertSame(3, $route->getMiddlewaresCount());
     }
 
     #[Test]
@@ -467,7 +467,7 @@ final class RouterTest extends TestCase
         $request = new Request('/ordered', RequestMethod::GET);
         $this->router->resolve($request);
 
-        $this->assertSame(['first', 'second', 'third'], OrderTrackingMiddleware::$executionOrder);
+        self::assertSame(['first', 'second', 'third'], OrderTrackingMiddleware::$executionOrder);
     }
 
     #[Test]
@@ -485,8 +485,8 @@ final class RouterTest extends TestCase
         $request = new Request('/with-args', RequestMethod::GET);
         $this->router->resolve($request);
 
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(['arg1', 'arg2', 42], ArgumentCapturingMiddleware::$capturedArgs);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(['arg1', 'arg2', 42], ArgumentCapturingMiddleware::$capturedArgs);
     }
 
     #[Test]
@@ -521,8 +521,8 @@ final class RouterTest extends TestCase
         $request = new Request('/callable', RequestMethod::GET);
         $this->router->resolve($request);
 
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(1, CallableMiddlewareTest::$wasCalled);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(1, CallableMiddlewareTest::$wasCalled);
     }
 
     #[Test]
@@ -539,9 +539,9 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve($request);
-            $this->fail('Expected MissingRequiredArgumentException');
+            self::fail('Expected MissingRequiredArgumentException');
         } catch (MissingRequiredArgumentException) {
-            $this->assertTrue(true);
+            self::assertTrue(true);
         }
     }
 
@@ -559,8 +559,8 @@ final class RouterTest extends TestCase
         $request = new Request('/nullable/test/1/2.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
     }
 
     #[Test]
@@ -576,9 +576,9 @@ final class RouterTest extends TestCase
         $request = new Request('/bool-test/0/1.5', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(false, FakeController::$lastArgs['active']);
-        $this->assertSame(1.5, FakeController::$lastArgs['ratio']);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(false, FakeController::$lastArgs['active']);
+        self::assertSame(1.5, FakeController::$lastArgs['ratio']);
     }
 
     #[Test]
@@ -597,9 +597,9 @@ final class RouterTest extends TestCase
         $routeExport = var_export($originalRoute, true);
         $deserialized = eval('return ' . $routeExport . ';');
 
-        $this->assertSame(2, $deserialized->getMiddlewaresCount());
-        $this->assertSame(FakeMiddleware::class, $deserialized->getMiddleware(0));
-        $this->assertSame('AnotherMiddleware', $deserialized->getMiddleware(1));
+        self::assertSame(2, $deserialized->getMiddlewaresCount());
+        self::assertSame(FakeMiddleware::class, $deserialized->getMiddleware(0));
+        self::assertSame('AnotherMiddleware', $deserialized->getMiddleware(1));
     }
 
     #[Test]
@@ -616,8 +616,8 @@ final class RouterTest extends TestCase
         $exactRequest = new Request('/special/endpoint', RequestMethod::GET);
         $this->router->resolve($exactRequest);
 
-        $this->assertSame(1, FakeController::$indexCalls);
-        $this->assertSame(0, FakeController::$paramsCalls);
+        self::assertSame(1, FakeController::$indexCalls);
+        self::assertSame(0, FakeController::$paramsCalls);
 
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
@@ -626,10 +626,10 @@ final class RouterTest extends TestCase
         try {
             $this->router->resolve($paramRequest);
         } catch (MissingRequiredArgumentException) {
-            $this->assertTrue(true);
+            self::assertTrue(true);
             return;
         }
-        $this->fail('Expected MissingRequiredArgumentException');
+        self::fail('Expected MissingRequiredArgumentException');
     }
 
     #[Test]
@@ -643,8 +643,8 @@ final class RouterTest extends TestCase
         $request = new Request('/', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
     }
 
     #[Test]
@@ -661,8 +661,8 @@ final class RouterTest extends TestCase
         $getRequest = new Request('/resource', RequestMethod::GET);
         $getResult = $this->router->resolve($getRequest);
 
-        $this->assertInstanceOf(TextResponse::class, $getResult);
-        $this->assertSame(1, FakeController::$indexCalls);
+        self::assertInstanceOf(TextResponse::class, $getResult);
+        self::assertSame(1, FakeController::$indexCalls);
     }
 
     #[Test]
@@ -676,9 +676,9 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve($request);
-            $this->fail('Expected MethodNotAllowedException');
+            self::fail('Expected MethodNotAllowedException');
         } catch (MethodNotAllowedException $exception) {
-            $this->assertContains(RequestMethod::GET->value, $exception->allowedMethods);
+            self::assertContains(RequestMethod::GET->value, $exception->allowedMethods);
         }
     }
 
@@ -693,9 +693,9 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve($request);
-            $this->fail('Expected MethodNotAllowedException');
+            self::fail('Expected MethodNotAllowedException');
         } catch (MethodNotAllowedException $exception) {
-            $this->assertContains(RequestMethod::GET->value, $exception->allowedMethods);
+            self::assertContains(RequestMethod::GET->value, $exception->allowedMethods);
         }
     }
 
@@ -711,12 +711,12 @@ final class RouterTest extends TestCase
 
         try {
             $this->router->resolve($request);
-            $this->fail('Expected MethodNotAllowedException');
+            self::fail('Expected MethodNotAllowedException');
         } catch (MethodNotAllowedException $exception) {
             $allowedMethods = $exception->allowedMethods;
 
-            $this->assertContains(RequestMethod::GET->value, $allowedMethods);
-            $this->assertContains(RequestMethod::POST->value, $allowedMethods);
+            self::assertContains(RequestMethod::GET->value, $allowedMethods);
+            self::assertContains(RequestMethod::POST->value, $allowedMethods);
         }
     }
 
@@ -777,8 +777,8 @@ final class RouterTest extends TestCase
         $request = new Request('/nullable', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertNull(NullableController::$receivedValue);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertNull(NullableController::$receivedValue);
     }
 
     #[Test]
@@ -800,8 +800,8 @@ final class RouterTest extends TestCase
         $request = new Request('/request/42', RequestMethod::GET);
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame([42], RequestParameterController::$receivedArguments);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame([42], RequestParameterController::$receivedArguments);
     }
 
     #[Test]
@@ -823,7 +823,7 @@ final class RouterTest extends TestCase
         $request = new Request('/string/123', RequestMethod::GET);
         $this->router->resolve($request);
 
-        $this->assertSame('123', StringParameterController::$receivedValue);
+        self::assertSame('123', StringParameterController::$receivedValue);
     }
 
     #[Test]
@@ -855,11 +855,11 @@ final class RouterTest extends TestCase
                 true
             );
 
-            $this->assertFileExists($cacheFile);
+            self::assertFileExists($cacheFile);
 
             $newRouter = new Router($this->pipeline);
 
-            $this->assertTrue(
+            self::assertTrue(
                 $newRouter->loadRoutesFromCache($cacheFile)
             );
 
@@ -870,8 +870,8 @@ final class RouterTest extends TestCase
 
             $result = $newRouter->resolve($request);
 
-            $this->assertInstanceOf(TextResponse::class, $result);
-            $this->assertSame(1, FakeController::$wasCalled);
+            self::assertInstanceOf(TextResponse::class, $result);
+            self::assertSame(1, FakeController::$wasCalled);
         } finally {
             @unlink($registryFile);
             @unlink($cacheFile);
@@ -907,7 +907,7 @@ final class RouterTest extends TestCase
 
             $routes = $this->getRoutesProperty($this->router);
 
-            $this->assertSame([], $routes);
+            self::assertSame([], $routes);
         } finally {
             @unlink($cacheFile);
             @unlink($registryFile);
@@ -939,11 +939,11 @@ final class RouterTest extends TestCase
                 false
             );
 
-            $this->assertFileDoesNotExist($cacheFile);
+            self::assertFileDoesNotExist($cacheFile);
 
             $routes = $this->getRoutesProperty($this->router);
 
-            $this->assertArrayHasKey(
+            self::assertArrayHasKey(
                 RequestMethod::GET->value,
                 $routes
             );
@@ -976,8 +976,8 @@ final class RouterTest extends TestCase
                 'index'
             );
 
-            $this->assertSame($requestMethod, $route->requestMethod);
-            $this->assertSame(
+            self::assertSame($requestMethod, $route->requestMethod);
+            self::assertSame(
                 $route,
                 $this->getRoutesProperty($this->router)[$requestMethod->value][$path]
             );
@@ -1008,9 +1008,9 @@ final class RouterTest extends TestCase
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(1, FakeController::$indexCalls);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(1, FakeController::$indexCalls);
     }
 
     #[Test]
@@ -1037,9 +1037,9 @@ final class RouterTest extends TestCase
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(
             ['id' => 42, 'type' => 'default'],
             FakeController::$lastArgs
         );
@@ -1076,10 +1076,10 @@ final class RouterTest extends TestCase
 
         $result = $this->router->resolve($request);
 
-        $this->assertInstanceOf(TextResponse::class, $result);
-        $this->assertSame(1, FakeController::$wasCalled);
-        $this->assertSame(0, FakeController::$indexCalls);
-        $this->assertSame(1, FakeController::$headCalls);
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+        self::assertSame(0, FakeController::$indexCalls);
+        self::assertSame(1, FakeController::$headCalls);
     }
 
     #[Test]
@@ -1140,9 +1140,9 @@ final class RouterTest extends TestCase
                 )
             );
 
-            $this->fail('Expected MethodNotAllowedException');
+            self::fail('Expected MethodNotAllowedException');
         } catch (MethodNotAllowedException $exception) {
-            $this->assertSame(
+            self::assertSame(
                 [
                     RequestMethod::GET->value,
                     RequestMethod::POST->value,
