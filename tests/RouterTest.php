@@ -66,7 +66,7 @@ final class RouterTest extends TestCase
 
         self::assertInstanceOf(Route::class, $route);
         self::assertInstanceOf(Route::class, $route);
-        self::assertSame(RequestMethod::fromString($method), $route->requestMethod);
+        self::assertSame(RequestMethod::tryFromString($method), $route->requestMethod);
         self::assertSame('/users', $route->path);
         self::assertSame('UserController', $route->controller);
         self::assertSame($action ?? '__invoke', $route->action);
