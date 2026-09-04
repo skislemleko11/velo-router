@@ -34,7 +34,7 @@ class Route
     /**
      * Gets the middleware at the given index. Returns null if it's not set.
      *
-     * @return string|array|MiddlewareInterface{0: string, 1?: list<mixed>}|callable|null
+     * @return string|array{0: string, 1?: list<mixed>}|MiddlewareInterface|callable|null
      */
     public function getMiddleware(int $index): MiddlewareInterface|string|array|callable|null
     {

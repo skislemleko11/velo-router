@@ -14,7 +14,7 @@ trait AddMiddlewaresTrait
     private array $middlewares = [];
 
     /**
-     * @param string|array|MiddlewareInterface{0: string, 1?: list<mixed>}|callable $middleware
+     * @param string|array{0: string, 1?: list<mixed>}|MiddlewareInterface|callable $middleware
      * Middleware class name/ID binded in the DI Container or an array of class name/ID binded in the DI Container
      * and array of args which will be passed to the 'handle' middleware's method,
      * or callable - facory function which must return an instance of MiddlewareInterface.
@@ -31,7 +31,7 @@ trait AddMiddlewaresTrait
     }
 
     /**
-     * @param string|array|MiddlewareInterface{0: string, 1?: list<mixed>}|callable ...$middlewares
+     * @param string|array{0: string, 1?: list<mixed>}|MiddlewareInterface|callable ...$middlewares
      * Middleware class name/ID binded in the DI Container or an array of class name/ID binded in the DI Container
      * and array of args which will be passed to the 'handle' middleware's method,
      * or callable - facory function which must return an instance of MiddlewareInterface.
