@@ -14,11 +14,14 @@ use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
  */
 class MethodNotAllowedException extends Exception implements RouterExceptionInterface, HttpResponseExceptionWithHeadersInterface
 {
+    /**
+     * @param list<string> $allowedMethods
+     */
     public function __construct(
         public readonly array $allowedMethods,
-        string $message = 'Method Not Allowed!',
-        int $code = 0,
-        ?Throwable $previous = null,
+        string                $message = 'Method Not Allowed!',
+        int                   $code = 0,
+        ?Throwable            $previous = null,
     )
     {
         parent::__construct($message, $code, $previous);

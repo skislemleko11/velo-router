@@ -98,6 +98,8 @@ readonly class Pipeline
     /**
      * Method dedicated for Routes' middlewares. It uses the main method.
      *
+     * @param list<mixed> $castedArgs
+     *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      * @throws MustImplementMiddlewareInterfaceException
@@ -112,6 +114,8 @@ readonly class Pipeline
 
     /**
      * Executes the action of the given route's controller.
+     *
+     * @param list<mixed> $castedArgs
      *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException

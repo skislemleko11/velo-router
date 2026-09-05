@@ -215,6 +215,9 @@ class Router
 
         foreach ($this->routes[$request->method->value] ?? [] as $route) {
             if (preg_match($route->compiledRegex, $request->urlPath, $matches)) {
+                /**
+                 * @var array<string, string> $namedArgs
+                 */
                 $namedArgs = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
                 return $this->callAction($route, $request, $namedArgs);
@@ -256,6 +259,8 @@ class Router
     /**
      * Calls the action method of the appropriate controller for the given Route.
      *
+     * @param array<string, string> $urlMethodArgs
+     *
      * @throws ContainerExceptionInterface
      * @throws ControllerMethodInvalidReturnTypeException
      * @throws MiddlewareNotFoundException
@@ -270,7 +275,7 @@ class Router
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
      */
-    private function callAction(Route $route, Request $request, array $getMethodArgs = []): Response
+    private function callAction(Route $route, Request $request, array $urlMethodArgs = []): Response
     {
         if (!class_exists($route->controller)) {
             throw new NotFoundControllerException("The requested controller: $route->controller was not found.");
@@ -283,7 +288,7 @@ class Router
         $castedArgs = $this->castMethodsArgsAndAddRequestToThemIfNeeded(
             className: $route->controller,
             methodName: $route->action,
-            args: $getMethodArgs,
+            args: $urlMethodArgs,
             request: $request
         );
 
@@ -293,12 +298,16 @@ class Router
     /**
      * Casts the given arguments for the given controller class name and method name.
      *
-     * @throws ReflectionException
+     * @param array<string, string> $args
+     *
+     * @return list<mixed>
+     *
      * @throws MissingRequiredArgumentException
      * @throws ParameterMissingTypeDeclarationException
      * @throws ParameterUnionTypeException
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
+     * @throws ReflectionException
      */
     private function castMethodsArgsAndAddRequestToThemIfNeeded(
         string  $className,
@@ -323,13 +332,14 @@ class Router
             }
 
             if ($paramType instanceof ReflectionNamedType) {
-                if ($paramType->getName() === Request::class) {
+                $typeName = $paramType->getName();
+
+                if ($typeName === Request::class) {
                     $castedArgs[] = $request;
                 } elseif (isset($args[$paramName])) {
                     $value = $args[$paramName];
 
                     if ($paramType->isBuiltin()) {
-                        $typeName = $paramType->getName();
                         settype($value, $typeName);
                     }
 

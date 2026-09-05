@@ -42,21 +42,21 @@ class Route
     }
 
     /**
-     * Getter method for middlewares array.
+     * @return list<MiddlewareInterface|string|array{0: string, 1?: list<mixed>}|callable>
      */
     public function getMiddlewares(): array
     {
         return $this->middlewares;
     }
 
-    /**
-     * Returns the count (length) of middlewares array.
-     */
     public function getMiddlewaresCount(): int
     {
         return count($this->middlewares);
     }
 
+    /**
+     * @param array<string, mixed> $array
+     */
     public static function __set_state(array $array): object
     {
         $route = new self(
