@@ -72,6 +72,9 @@ final class RouterTest extends TestCase
         self::assertSame($action ?? '__invoke', $route->action);
     }
 
+    /**
+     * @return list<array{0: string, 1: string|null}>
+     */
     public static function routesRegisterDataProvider(): array
     {
         return [
@@ -90,7 +93,6 @@ final class RouterTest extends TestCase
             ['options', 'a'],
             ['options', null],
         ];
-
     }
 
     #[Test]

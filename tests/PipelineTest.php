@@ -227,6 +227,8 @@ class FakeContainer implements ContainerInterface
 class PipelineFakeController
 {
     public int $wasCalled = 0;
+
+    /** @var list<mixed> */
     public array $lastArgs = [];
     public ?Request $lastReceivedRequest = null;
 
@@ -260,6 +262,7 @@ class PipelineFakeController
 
 class StepMiddleware implements MiddlewareInterface
 {
+    /** @var list<string> */
     public static array $executionOrder = [];
 
     public function __construct(private readonly string $name)

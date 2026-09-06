@@ -78,6 +78,9 @@ final class RouteTest extends TestCase
         self::assertSame('middleware', $this->route->getMiddleware(0));
     }
 
+    /**
+     * @param list<string> $middlewares
+     */
     #[Test]
     #[DataProvider('middlewaresCountDataProvider')]
     public function it_gets_middleware_count(array $middlewares): void
@@ -85,7 +88,21 @@ final class RouteTest extends TestCase
         foreach ($middlewares as $middleware) {
             $this->route->addMiddleware($middleware);
         }
+
         self::assertSame(count($middlewares), $this->route->getMiddlewaresCount());
+    }
+
+    /**
+     * @return array<string, array{0: list<string>}>
+     */
+    public static function middlewaresCountDataProvider(): array
+    {
+        return [
+            '1_middleware' => [['middleware']],
+            '2_middlewares' => [['middleware', 'aaa']],
+            '3_middlewares' => [['middleware', 'as', 'af']],
+            '4_middlewares' => [['middleware', 'aqqqe', 's', 'r']],
+        ];
     }
 
     #[Test]
@@ -112,16 +129,6 @@ final class RouteTest extends TestCase
         self::assertSame('auth', $restoredRoute->getMiddleware(0));
         self::assertSame(['rate-limit', ['60']], $restoredRoute->getMiddleware(1));
         self::assertSame(2, $restoredRoute->getMiddlewaresCount());
-    }
-
-    public static function middlewaresCountDataProvider(): array
-    {
-        return [
-            [['middleware']],
-            [['middleware', 'aaa']],
-            [['middleware', 'as', 'af']],
-            [['middleware', 'aqqqe', 's', 'r']],
-        ];
     }
 
     private function getMiddlewaresProperty(): mixed
