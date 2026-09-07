@@ -10,7 +10,7 @@ use Velo\Router\Middlewares\MiddlewareInterface;
 /**
  * Represnts Route, it's registered in Router Class.
  */
-class Route
+final class Route
 {
     use AddMiddlewaresTrait;
 

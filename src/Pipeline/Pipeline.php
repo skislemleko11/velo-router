@@ -17,7 +17,7 @@ use Velo\Router\Route\Route;
 /**
  * Executes middleware chains.
  */
-readonly class Pipeline
+final readonly class Pipeline
 {
     public function __construct(private ContainerInterface $container)
     {
