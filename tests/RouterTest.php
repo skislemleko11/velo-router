@@ -1169,14 +1169,14 @@ class FakeController
     public static int $headCalls = 0;
     public static array $lastArgs = [];
 
-    public function index(Request $request): TextResponse
+    public function index(): TextResponse
     {
         self::$wasCalled++;
         self::$indexCalls++;
         return new TextResponse('hehe');
     }
 
-    public function actionWithParams(Request $request, int $id, int $sth): TextResponse
+    public function actionWithParams(int $id, int $sth): TextResponse
     {
         self::$wasCalled++;
         self::$paramsCalls++;
@@ -1184,26 +1184,26 @@ class FakeController
         return new TextResponse('hehe');
     }
 
-    public function actionWithDefaultValue(Request $request, int $id, string $type = 'default'): TextResponse
+    public function actionWithDefaultValue(int $id, string $type = 'default'): TextResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['id' => $id, 'type' => $type];
         return new TextResponse('hehe');
     }
 
-    public function actionWithNullableAndTyped(Request $request, ?string $label, bool $active, float $ratio): TextResponse
+    public function actionWithNullableAndTyped(?string $label, bool $active, float $ratio): TextResponse
     {
         self::$wasCalled++;
         self::$lastArgs = ['label' => $label, 'active' => $active, 'ratio' => $ratio];
         return new TextResponse('hehe');
     }
 
-    public function invalidReturnType(Request $request): string
+    public function invalidReturnType(): string
     {
         return 'string';
     }
 
-    public function head(Request $request): TextResponse
+    public function head(): TextResponse
     {
         self::$wasCalled++;
         self::$headCalls++;
@@ -1344,7 +1344,6 @@ class NullableController
     public static mixed $receivedValue = null;
 
     public function index(
-        Request $request,
         ?string $value
     ): TextResponse
     {
@@ -1359,8 +1358,7 @@ class RequestParameterController
     public static array $receivedArguments = [];
 
     public function index(
-        Request $request,
-        int     $id
+        int $id
     ): TextResponse
     {
         self::$receivedArguments = [$id];
@@ -1374,8 +1372,7 @@ class StringParameterController
     public static ?string $receivedValue = null;
 
     public function index(
-        Request $request,
-        string  $value
+        string $value
     ): TextResponse
     {
         self::$receivedValue = $value;
