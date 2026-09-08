@@ -6,7 +6,7 @@ namespace Velo\Router\Router\Exceptions;
 use Velo\Exceptions\NotFoundException;
 use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
 
-class NotFoundControllerException extends NotFoundException implements RouterExceptionInterface
+final class NotFoundControllerException extends NotFoundException implements RouterExceptionInterface
 {
     protected $message = 'The requested controller was not found.';
 

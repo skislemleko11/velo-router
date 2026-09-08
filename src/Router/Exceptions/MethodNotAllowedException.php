@@ -12,7 +12,7 @@ use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
  * It's thrown in Router class when the requested url is not found under the requested method, but under another one.
  * It represents 405 Error.
  */
-class MethodNotAllowedException extends Exception implements RouterExceptionInterface, HttpResponseExceptionWithHeadersInterface
+final class MethodNotAllowedException extends Exception implements RouterExceptionInterface, HttpResponseExceptionWithHeadersInterface
 {
     /**
      * @param list<string> $allowedMethods

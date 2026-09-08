@@ -6,7 +6,7 @@ namespace Velo\Router\Router\Exceptions\InvalidParameterExceptions;
 use Exception;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\Interfaces\InvalidParameterExceptionInterface;
 
-class UnexpectedInvalidParameterException extends Exception implements InvalidParameterExceptionInterface
+final class UnexpectedInvalidParameterException extends Exception implements InvalidParameterExceptionInterface
 {
 
 }

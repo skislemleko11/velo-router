@@ -6,7 +6,7 @@ namespace Velo\Router\Pipeline\Exceptions;
 use Exception;
 use Velo\Router\Pipeline\Exceptions\Interfaces\PipelineExceptionInterface;
 
-class MiddlewareNotFoundException extends Exception implements PipelineExceptionInterface
+final class MiddlewareNotFoundException extends Exception implements PipelineExceptionInterface
 {
     protected $message = 'Middleware not found!';
 }
