@@ -18,11 +18,11 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
-use Velo\Router\Route\Route;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\UnexpectedInvalidParameterException;
+use Velo\Router\Route;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
+use Velo\Router\Router\Exceptions\InvalidParameterExceptions\UnexpectedInvalidParameterException;
 use Velo\Router\Router\Exceptions\MethodNotAllowedException;
 use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
@@ -30,6 +30,7 @@ use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
+use Velo\Router\Router\Interfaces\CorsRouterExtensionInterface;
 
 /**
  * Router class, it registers Routes and resolves Requests.
@@ -42,7 +43,8 @@ class Router
     private array $routes = [];
 
     public function __construct(
-        private readonly Pipeline $pipeline,
+        private readonly Pipeline                     $pipeline,
+        private readonly CorsRouterExtensionInterface $corsExtension,
     )
     {
     }
@@ -146,7 +148,7 @@ class Router
      */
     public function resolve(Request $request): Response
     {
-        if ($response = $this->findMatch($request)) {
+        if ($response = $this->findMatchAndExecute($request)) {
             return $response;
         }
 
@@ -207,14 +209,31 @@ class Router
      * @throws ParameterIntersectionTypeException
      * @throws UnexpectedInvalidParameterException
      */
-    private function findMatch(Request $request): ?Response
+    private function findMatchAndExecute(Request $request): ?Response
     {
-        if ($route = $this->routes[$request->method->value][$request->urlPath] ?? null) {
+        $isPreflight = $this->corsExtension->isPreflight($request);
+        $requestedMethod = $isPreflight
+            ? $this->corsExtension->getRequestedMethodFromPreflight($request)
+            : $request->method;
+
+        if ($requestedMethod === RequestMethod::UNKNOWN) {
+            return null;
+        }
+
+        if ($route = $this->routes[$requestedMethod->value][$request->urlPath] ?? null) {
+            if ($isPreflight && !$this->corsExtension->hasCorsMiddleware($route)) {
+                return null;
+            }
+
             return $this->callAction($route, $request);
         }
 
-        foreach ($this->routes[$request->method->value] ?? [] as $route) {
+        foreach ($this->routes[$requestedMethod->value] ?? [] as $route) {
             if (preg_match($route->compiledRegex, $request->urlPath, $matches)) {
+                if ($isPreflight && !$this->corsExtension->hasCorsMiddleware($route)) {
+                    return null;
+                }
+
                 /**
                  * @var array<string, string> $namedArgs
                  */
@@ -238,17 +257,19 @@ class Router
         $allowedMethods = [];
 
         foreach ($this->routes as $method => $routes) {
-            if ($method !== $request->method->value) {
-                if (isset($routes[$request->urlPath])) {
-                    $allowedMethods[] = $method;
-                    continue;
-                }
+            if ($method === $request->method->value) {
+                continue;
+            }
 
-                foreach ($routes as $route) {
-                    if (preg_match($route->compiledRegex, $request->urlPath)) {
-                        $allowedMethods[] = $method;
-                        continue 2;
-                    }
+            if (isset($routes[$request->urlPath])) {
+                $allowedMethods[] = $method;
+                continue;
+            }
+
+            foreach ($routes as $route) {
+                if (preg_match($route->compiledRegex, $request->urlPath)) {
+                    $allowedMethods[] = $method;
+                    continue 2;
                 }
             }
         }
@@ -381,7 +402,9 @@ class Router
     {
         $dir = dirname($filePath);
 
-        if (!((is_file($filePath) && is_writable($filePath)) || (!file_exists($filePath) && is_writable($dir)))) {
+        if (!((is_file($filePath) && is_writable($filePath)) ||
+            (!file_exists($filePath) && is_writable($dir)))
+        ) {
             throw new UnableToCacheRoutesException(
                 "Unable to cache routes to the given file path: $filePath!"
             );
@@ -407,7 +430,6 @@ class Router
     /**
      * Loads Routes from a cache file.
      *
-     * @param string $filePath Cache file path
      * @return bool False if the file does not exist or the given path is not a file or it's not readable, True if the file is loaded successfully
      */
     public function loadRoutesFromCache(string $filePath): bool
@@ -453,16 +475,18 @@ class Router
         bool   $cacheRoutesIfNotCached = true
     ): void
     {
-        if (!$this->loadRoutesFromCache($cachePath)) {
-            if ($this->loadRoutesFromRegistryFile($routesRegistryPath)) {
-                if ($cacheRoutesIfNotCached) {
-                    $this->cacheRoutes($cachePath);
-                }
-            } else {
-                throw new UnableToLoadRoutesException(
-                    "Router was unable to load routes either from cache file: $cachePath or registry file: $routesRegistryPath."
-                );
-            }
+        if ($this->loadRoutesFromCache($cachePath)) {
+            return;
+        }
+
+        if (!$this->loadRoutesFromRegistryFile($routesRegistryPath)) {
+            throw new UnableToLoadRoutesException(
+                "Router was unable to load routes either from cache file: $cachePath or registry file: $routesRegistryPath."
+            );
+        }
+
+        if ($cacheRoutesIfNotCached) {
+            $this->cacheRoutes($cachePath);
         }
     }
 }

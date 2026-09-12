@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router\Route;
+namespace Velo\Router;
 
 use Velo\Http\RequestMethod;
 use Velo\Router\Middlewares\AddMiddlewaresTrait;

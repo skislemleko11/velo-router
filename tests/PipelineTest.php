@@ -10,13 +10,13 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use stdClass;
 use Velo\Http\Request;
+use Velo\Http\RequestMethod;
 use Velo\Http\Responses\Concrete\TextResponse;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
-use Velo\Router\Route\Route;
-use Velo\Http\RequestMethod;
+use Velo\Router\Route;
 
 final class PipelineTest extends TestCase
 {

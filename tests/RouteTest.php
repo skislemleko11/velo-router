@@ -7,8 +7,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use Velo\Router\Route\Route;
 use Velo\Http\RequestMethod;
+use Velo\Router\Route;
 
 final class RouteTest extends TestCase
 {

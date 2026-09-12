@@ -12,7 +12,7 @@ use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
-use Velo\Router\Route\Route;
+use Velo\Router\Route;
 
 /**
  * Executes middleware chains.

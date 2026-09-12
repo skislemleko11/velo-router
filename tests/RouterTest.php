@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 namespace Velo\Router\Tests;
 
+use Exception;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
@@ -17,7 +20,7 @@ use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
-use Velo\Router\Route\Route;
+use Velo\Router\Route;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
 use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
@@ -28,13 +31,16 @@ use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
+use Velo\Router\Router\Interfaces\CorsRouterExtensionInterface;
 use Velo\Router\Router\Router;
 
+#[AllowMockObjectsWithoutExpectations]
 final class RouterTest extends TestCase
 {
-    protected Container $container;
-    protected Router $router;
-    protected Pipeline $pipeline;
+    private Container $container;
+    private Router $router;
+    private Pipeline $pipeline;
+    private CorsRouterExtensionInterface&MockObject $corsExtensionMock;
 
     protected function setUp(): void
     {
@@ -44,7 +50,8 @@ final class RouterTest extends TestCase
         $this->pipeline = new Pipeline($this->container);
         $this->container->set(Pipeline::class, fn() => $this->pipeline);
 
-        $this->router = new Router($this->pipeline);
+        $this->corsExtensionMock = self::createMock(CorsRouterExtensionInterface::class);
+        $this->router = new Router($this->pipeline, $this->corsExtensionMock);
     }
 
     private function getRoutesProperty(object $object): mixed
@@ -193,7 +200,7 @@ final class RouterTest extends TestCase
     }
 
     #[Test]
-    public function it_throws_page_not_found_exception(): void
+    public function it_throws_route_not_found_exception(): void
     {
         $this->expectException(RouteNotFound::class);
         $request = new Request('/users', RequestMethod::GET);
@@ -292,7 +299,7 @@ final class RouterTest extends TestCase
             self::assertStringContainsString('FakeController', (string)file_get_contents($cacheFile));
             self::assertStringContainsString('FakeMiddleware', (string)file_get_contents($cacheFile));
 
-            $cachedRouter = new Router($this->pipeline);
+            $cachedRouter = new Router($this->pipeline, $this->corsExtensionMock);
             self::assertTrue($cachedRouter->loadRoutesFromCache($cacheFile));
 
             $request = new Request('/cached/42', RequestMethod::GET);
@@ -340,7 +347,7 @@ final class RouterTest extends TestCase
             file_put_contents($registryFile, '<?php $router->get("/registry", "' . FakeController::class . '", "index");');
 
             $cacheFile = sys_get_temp_dir() . '/velo-cache-' . uniqid() . '.php';
-            $newRouter = new Router($this->pipeline);
+            $newRouter = new Router($this->pipeline, $this->corsExtensionMock);
 
             $newRouter->loadRoutesFromCacheIfExistsElseFromRegistryFile(
                 $cacheFile,
@@ -373,7 +380,7 @@ final class RouterTest extends TestCase
         try {
             $this->router->cacheRoutes($cacheFile);
 
-            $newRouter = new Router($this->pipeline);
+            $newRouter = new Router($this->pipeline, $this->corsExtensionMock);
             $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
             self::assertNotFalse($registryFile);
 
@@ -859,7 +866,7 @@ final class RouterTest extends TestCase
 
             self::assertFileExists($cacheFile);
 
-            $newRouter = new Router($this->pipeline);
+            $newRouter = new Router($this->pipeline, $this->corsExtensionMock);
 
             self::assertTrue(
                 $newRouter->loadRoutesFromCache($cacheFile)
@@ -1155,9 +1162,229 @@ final class RouterTest extends TestCase
         }
     }
 
-    public function it_registers()
+    #[Test]
+    public function it_throws_method_not_allowed_when_request_method_is_unknown_and_request_is_not_preflight(): void
     {
+        $this->router->get('/', FakeController::class, 'index');
 
+        $request = new Request('/', RequestMethod::UNKNOWN);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('isPreflight')
+            ->with($request)
+            ->willReturn(false);
+
+        try {
+            $this->router->resolve($request);
+
+            self::fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(
+                [
+                    RequestMethod::GET->value
+                ],
+                $exception->allowedMethods
+            );
+        }
+    }
+
+    #[Test]
+    public function it_throws_method_not_allowed_when_request_is_preflight_and_method_is_unknown(): void
+    {
+        $this->router->get('/', FakeController::class, 'index');
+
+        $request = new Request('/', RequestMethod::OPTIONS);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('isPreflight')
+            ->willReturn(true);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('getRequestedMethodFromPreflight')
+            ->with($request)
+            ->willReturn(RequestMethod::UNKNOWN);
+
+        try {
+            $this->router->resolve($request);
+
+            self::fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(
+                [
+                    RequestMethod::GET->value
+                ],
+                $exception->allowedMethods
+            );
+        }
+    }
+    
+    #[Test]
+    public function it_throws_method_not_allowed_when_request_is_preflight_and_method_is_known_but_has_no_cors(): void
+    {
+        $route = $this->router->query('/', FakeController::class, 'index');
+
+        $request = new Request('/', RequestMethod::OPTIONS);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('isPreflight')
+            ->willReturn(true);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('getRequestedMethodFromPreflight')
+            ->with($request)
+            ->willReturn(RequestMethod::QUERY);
+
+        $this->corsExtensionMock->expects(self::once())
+            ->method('hasCorsMiddleware')
+            ->with($route)
+            ->willReturn(false);
+
+        try {
+            $this->router->resolve($request);
+
+            self::fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(
+                [
+                    RequestMethod::QUERY->value
+                ],
+                $exception->allowedMethods
+            );
+        }
+    }
+
+    #[Test]
+    public function it_resolves_preflight_request_using_requested_method(): void
+    {
+        $route = $this->router->query('/users', FakeController::class, 'index')
+            ->addMiddleware(ThrowingMiddleware::class);
+
+        $request = new Request('/users', RequestMethod::OPTIONS);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('isPreflight')
+            ->with($request)
+            ->willReturn(true);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('getRequestedMethodFromPreflight')
+            ->with($request)
+            ->willReturn(RequestMethod::QUERY);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('hasCorsMiddleware')
+            ->with($route)
+            ->willReturn(true);
+
+        self::expectException(Exception::class);
+        self::expectExceptionMessageIs('exception');
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_resolves_preflight_request_for_parameterized_route_with_cors(): void
+    {
+        $route = $this->router->query('/users/{id}', FakeController::class, 'index')
+            ->addMiddleware(ThrowingMiddleware::class);
+
+        $request = new Request('/users/42', RequestMethod::OPTIONS);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('isPreflight')
+            ->with($request)
+            ->willReturn(true);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('getRequestedMethodFromPreflight')
+            ->with($request)
+            ->willReturn(RequestMethod::QUERY);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('hasCorsMiddleware')
+            ->with($route)
+            ->willReturn(true);
+
+        self::expectException(Exception::class);
+        self::expectExceptionMessageIs('exception');
+
+        $this->router->resolve($request);
+    }
+
+    #[Test]
+    public function it_does_not_use_requested_preflight_method_for_regular_request(): void
+    {
+        FakeController::$wasCalled = 0;
+
+        $this->router->post('/users', FakeController::class, 'index');
+
+        $request = new Request('/users', RequestMethod::POST);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('isPreflight')
+            ->with($request)
+            ->willReturn(false);
+
+        $this->corsExtensionMock
+            ->expects(self::never())
+            ->method('getRequestedMethodFromPreflight');
+
+        $this->corsExtensionMock
+            ->expects(self::never())
+            ->method('hasCorsMiddleware');
+
+        $result = $this->router->resolve($request);
+
+        self::assertInstanceOf(TextResponse::class, $result);
+        self::assertSame(1, FakeController::$wasCalled);
+    }
+
+    #[Test]
+    public function it_rejects_preflight_request_for_parameterized_route_without_cors(): void
+    {
+        $route = $this->router->query(
+            '/users/{id}',
+            FakeController::class,
+            'index'
+        );
+
+        $request = new Request('/users/42', RequestMethod::OPTIONS);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('isPreflight')
+            ->with($request)
+            ->willReturn(true);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('getRequestedMethodFromPreflight')
+            ->with($request)
+            ->willReturn(RequestMethod::QUERY);
+
+        $this->corsExtensionMock
+            ->expects(self::once())
+            ->method('hasCorsMiddleware')
+            ->with($route)
+            ->willReturn(false);
+
+        try {
+            $this->router->resolve($request);
+
+            self::fail('Expected MethodNotAllowedException');
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(
+                [RequestMethod::QUERY->value],
+                $exception->allowedMethods
+            );
+        }
     }
 }
 
@@ -1378,5 +1605,13 @@ class StringParameterController
         self::$receivedValue = $value;
 
         return new TextResponse('hehe');
+    }
+}
+
+class ThrowingMiddleware implements MiddlewareInterface
+{
+    public function handle(Request $request, callable $next): Response
+    {
+        throw new Exception('exception');
     }
 }
