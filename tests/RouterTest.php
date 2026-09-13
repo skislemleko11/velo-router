@@ -11,7 +11,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
-use Velo\Container\Container;
 use Velo\Http\Request;
 use Velo\Http\RequestMethod;
 use Velo\Http\Responses\Concrete\TextResponse;
@@ -21,11 +20,8 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
+use Velo\Router\Router\Exceptions\InvalidControllerSignatureException;
 use Velo\Router\Router\Exceptions\MethodNotAllowedException;
-use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
@@ -37,18 +33,16 @@ use Velo\Router\Router\Router;
 #[AllowMockObjectsWithoutExpectations]
 final class RouterTest extends TestCase
 {
-    private Container $container;
+    private ContainerInterface&MockObject $containerMock;
     private Router $router;
     private Pipeline $pipeline;
     private CorsRouterExtensionInterface&MockObject $corsExtensionMock;
 
     protected function setUp(): void
     {
-        $this->container = new Container();
-        $this->container->set(ContainerInterface::class, fn() => $this->container);
+        $this->containerMock = self::createMock(ContainerInterface::class);
 
-        $this->pipeline = new Pipeline($this->container);
-        $this->container->set(Pipeline::class, fn() => $this->pipeline);
+        $this->pipeline = new Pipeline($this->containerMock);
 
         $this->corsExtensionMock = self::createMock(CorsRouterExtensionInterface::class);
         $this->router = new Router($this->pipeline, $this->corsExtensionMock);
@@ -106,7 +100,8 @@ final class RouterTest extends TestCase
     public function it_resolves_a_simple_route(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController());
+
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/', FakeController::class, 'index');
         $request = new Request('/', RequestMethod::GET);
@@ -116,6 +111,15 @@ final class RouterTest extends TestCase
         self::assertSame(1, FakeController::$wasCalled);
     }
 
+    private function setInControllerMock(string ...$classesNames): void
+    {
+        $map = array_map(fn(string $className) => [$className, new $className()], $classesNames);
+
+        $this->containerMock->expects(self::atLeastOnce())
+            ->method('get')
+            ->willReturnMap($map);
+    }
+
     #[Test]
     public function it_prefers_exact_routes_over_parameterized_routes(): void
     {
@@ -123,7 +127,7 @@ final class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/users/me', FakeController::class, 'index');
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
@@ -140,7 +144,7 @@ final class RouterTest extends TestCase
     public function it_resolves_a_route_with_parameters_and_casts_them(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/users/{id}/{sth}', FakeController::class, 'actionWithParams');
 
@@ -158,7 +162,7 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/flags/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
@@ -175,7 +179,7 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/reports/{id}', FakeController::class, 'actionWithDefaultValue');
 
@@ -190,8 +194,14 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_missing_required_argument_exception_when_route_is_incomplete(): void
     {
-        $this->expectException(MissingRequiredArgumentException::class);
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->expectException(InvalidControllerSignatureException::class);
+        $this->expectExceptionMessageIs(
+            InvalidControllerSignatureException::missingRequiredArgument(
+                FakeController::class,
+                'actionWithParams',
+                'sth'
+            )->getMessage()
+        );
 
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
         $request = new Request('/users/5', RequestMethod::GET);
@@ -211,7 +221,8 @@ final class RouterTest extends TestCase
     public function it_throws_controller_method_invalid_return_type_exception(): void
     {
         $this->expectException(ControllerMethodInvalidReturnTypeException::class);
-        $this->container->set(FakeController::class, fn() => new FakeController());
+
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/', FakeController::class, 'invalidReturnType');
         $request = new Request('/', RequestMethod::GET);
@@ -235,8 +246,7 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeMiddleware::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
+        $this->setInControllerMock(FakeController::class, FakeMiddleware::class);
 
         $this->router->get('/dashboard', FakeController::class, 'index')
             ->addMiddleware(FakeMiddleware::class);
@@ -254,8 +264,7 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(StoppingMiddleware::class, fn() => new StoppingMiddleware());
+        $this->setInControllerMock(FakeController::class, FakeMiddleware::class, StoppingMiddleware::class);
 
         $this->router->get('/protected', FakeController::class, 'index')
             ->addMiddleware(StoppingMiddleware::class);
@@ -283,8 +292,7 @@ final class RouterTest extends TestCase
         FakeController::$lastArgs = [];
         FakeMiddleware::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
+        $this->setInControllerMock(FakeController::class, FakeMiddleware::class);
 
         $this->router->get('/cached/{id}', FakeController::class, 'actionWithDefaultValue')
             ->addMiddleware(FakeMiddleware::class);
@@ -338,7 +346,7 @@ final class RouterTest extends TestCase
     public function it_loads_routes_from_registry_file_when_cache_does_not_exist(): void
     {
         FakeController::$wasCalled = 0;
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
         self::assertNotFalse($registryFile);
@@ -371,7 +379,7 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/cached-test/{id}', FakeController::class, 'actionWithDefaultValue');
         $cacheFile = tempnam(sys_get_temp_dir(), 'velo-router-');
@@ -427,22 +435,30 @@ final class RouterTest extends TestCase
     {
         $this->expectException(NotFoundControllerMethodException::class);
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->containerMock->expects(self::never())
+            ->method(self::anything());
 
         $this->router->get('/test', FakeController::class, 'nonExistentMethod');
         $request = new Request('/test', RequestMethod::GET);
+
         $this->router->resolve($request);
     }
 
     #[Test]
     public function it_throws_parameter_missing_type_declaration_exception(): void
     {
-        $this->expectException(ParameterMissingTypeDeclarationException::class);
-
-        $this->container->set(TypesController::class, fn() => new TypesController());
+        $this->expectException(InvalidControllerSignatureException::class);
+        $this->expectExceptionMessageIs(
+            InvalidControllerSignatureException::missingTypeDeclaration(
+                TypesController::class,
+                'noType',
+                'id'
+            )->getMessage()
+        );
 
         $this->router->get('/types/{id}', TypesController::class, 'noType');
         $request = new Request('/types/5', RequestMethod::GET);
+
         $this->router->resolve($request);
     }
 
@@ -463,10 +479,7 @@ final class RouterTest extends TestCase
     {
         OrderTrackingMiddleware::$executionOrder = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(FirstOrderMiddleware::class, fn() => new FirstOrderMiddleware());
-        $this->container->set(SecondOrderMiddleware::class, fn() => new SecondOrderMiddleware());
-        $this->container->set(ThirdOrderMiddleware::class, fn() => new ThirdOrderMiddleware());
+        $this->setInControllerMock(FakeController::class, FirstOrderMiddleware::class, SecondOrderMiddleware::class, ThirdOrderMiddleware::class);
 
         $this->router->get('/ordered', FakeController::class, 'index')
             ->addMiddleware(FirstOrderMiddleware::class)
@@ -485,13 +498,13 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         ArgumentCapturingMiddleware::$capturedArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(ArgumentCapturingMiddleware::class, fn() => new ArgumentCapturingMiddleware());
+        $this->setInControllerMock(FakeController::class, ArgumentCapturingMiddleware::class);
 
         $this->router->get('/with-args', FakeController::class, 'index')
             ->addMiddleware([ArgumentCapturingMiddleware::class, ['arg1', 'arg2', 42]]);
 
         $request = new Request('/with-args', RequestMethod::GET);
+
         $this->router->resolve($request);
 
         self::assertSame(1, FakeController::$wasCalled);
@@ -503,8 +516,7 @@ final class RouterTest extends TestCase
     {
         $this->expectException(MustImplementMiddlewareInterfaceException::class);
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(InvalidMiddleware::class, fn() => new InvalidMiddleware());
+        $this->setInControllerMock(FakeController::class, InvalidMiddleware::class);
 
         $this->router->get('/bad-middleware', FakeController::class, 'index')
             ->addMiddleware(InvalidMiddleware::class);
@@ -519,7 +531,7 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         CallableMiddlewareTest::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class, CallableTestMiddlewareImpl::class);
 
         $this->router->get('/callable', FakeController::class, 'index')
             ->addMiddleware(function (): MiddlewareInterface {
@@ -540,32 +552,30 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
-
         $this->router->get('/api/{version}/users/{id}/posts/{postId}', FakeController::class, 'actionWithParams');
 
         $request = new Request('/api/v1/users/123/posts/456', RequestMethod::GET);
 
         try {
             $this->router->resolve($request);
-            self::fail('Expected MissingRequiredArgumentException');
-        } catch (MissingRequiredArgumentException) {
+            self::fail('Expected InvalidControllerSignatureException');
+        } catch (InvalidControllerSignatureException) {
             self::assertTrue(true);
         }
     }
 
-    #[
-        Test]
+    #[Test]
     public function it_resolves_route_with_all_nullable_parameters(): void
     {
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/nullable/{label}/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
         $request = new Request('/nullable/test/1/2.5', RequestMethod::GET);
+
         $result = $this->router->resolve($request);
 
         self::assertInstanceOf(TextResponse::class, $result);
@@ -578,11 +588,12 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/bool-test/{active}/{ratio}', FakeController::class, 'actionWithNullableAndTyped');
 
         $request = new Request('/bool-test/0/1.5', RequestMethod::GET);
+
         $result = $this->router->resolve($request);
 
         self::assertInstanceOf(TextResponse::class, $result);
@@ -595,9 +606,6 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
         FakeMiddleware::$wasCalled = 0;
-
-        $this->container->set(FakeController::class, fn() => new FakeController());
-        $this->container->set(FakeMiddleware::class, fn() => new FakeMiddleware());
 
         $originalRoute = $this->router->get('/serialized', FakeController::class, 'index')
             ->addMiddleware(FakeMiddleware::class)
@@ -617,7 +625,7 @@ final class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$paramsCalls = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/special/endpoint', FakeController::class, 'index');
         $this->router->get('/special/{name}', FakeController::class, 'actionWithParams');
@@ -632,13 +640,15 @@ final class RouterTest extends TestCase
         FakeController::$paramsCalls = 0;
 
         $paramRequest = new Request('/special/something', RequestMethod::GET);
+
         try {
             $this->router->resolve($paramRequest);
-        } catch (MissingRequiredArgumentException) {
+        } catch (InvalidControllerSignatureException) {
             self::assertTrue(true);
             return;
         }
-        self::fail('Expected MissingRequiredArgumentException');
+
+        self::fail('Expected InvalidControllerSignatureException');
     }
 
     #[Test]
@@ -646,10 +656,12 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
+
         $this->router->get('/', FakeController::class, 'index');
 
         $request = new Request('/', RequestMethod::GET);
+
         $result = $this->router->resolve($request);
 
         self::assertInstanceOf(TextResponse::class, $result);
@@ -662,12 +674,13 @@ final class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$wasCalled = 0;
 
-        $this->container->set(FakeController::class, fn() => new FakeController());
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'actionWithParams');
 
         $getRequest = new Request('/resource', RequestMethod::GET);
+
         $getResult = $this->router->resolve($getRequest);
 
         self::assertInstanceOf(TextResponse::class, $getResult);
@@ -677,8 +690,6 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_method_not_allowed_exception_for_existing_route_with_wrong_method(): void
     {
-        $this->container->set(FakeController::class, fn() => new FakeController());
-
         $this->router->get('/users', FakeController::class, 'index');
 
         $request = new Request('/users', RequestMethod::POST);
@@ -694,8 +705,6 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_method_not_allowed_exception_for_parameterized_route_with_wrong_method(): void
     {
-        $this->container->set(FakeController::class, fn() => new FakeController());
-
         $this->router->get('/users/{id}', FakeController::class, 'actionWithParams');
 
         $request = new Request('/users/123', RequestMethod::POST);
@@ -711,8 +720,6 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_returns_all_allowed_methods_for_matching_path(): void
     {
-        $this->container->set(FakeController::class, fn() => new FakeController());
-
         $this->router->get('/resource', FakeController::class, 'index');
         $this->router->post('/resource', FakeController::class, 'index');
 
@@ -732,9 +739,14 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_union_type_exception_for_controller_parameter(): void
     {
-        $this->expectException(ParameterUnionTypeException::class);
-
-        $this->container->set(TypesController::class, fn() => new TypesController());
+        $this->expectException(InvalidControllerSignatureException::class);
+        $this->expectExceptionMessageIs(
+            InvalidControllerSignatureException::unionTypeNotSupported(
+                TypesController::class,
+                'unionType',
+                'id'
+            )->getMessage()
+        );
 
         $this->router->get('/types/{id}', TypesController::class, 'unionType');
 
@@ -746,9 +758,14 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_intersection_type_exception_for_controller_parameter(): void
     {
-        $this->expectException(ParameterIntersectionTypeException::class);
-
-        $this->container->set(TypesController::class, fn() => new TypesController());
+        $this->expectException(InvalidControllerSignatureException::class);
+        $this->expectExceptionMessageIs(
+            InvalidControllerSignatureException::intersectionTypeNotSupported(
+                TypesController::class,
+                'intersectionType',
+                'value'
+            )->getMessage()
+        );
 
         $this->router->get('/types/{value}', TypesController::class, 'intersectionType');
 
@@ -760,9 +777,14 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_throws_missing_required_argument_when_parameter_is_not_nullable_and_has_no_default(): void
     {
-        $this->expectException(MissingRequiredArgumentException::class);
-
-        $this->container->set(TypesController::class, fn() => new TypesController());
+        $this->expectException(InvalidControllerSignatureException::class);
+        $this->expectExceptionMessageIs(
+            InvalidControllerSignatureException::missingRequiredArgument(
+                TypesController::class,
+                'requiredParameter',
+                'required'
+            )->getMessage()
+        );
 
         $this->router->get('/types/{id}', TypesController::class, 'requiredParameter');
 
@@ -776,10 +798,7 @@ final class RouterTest extends TestCase
     {
         NullableController::$receivedValue = 'not-null';
 
-        $this->container->set(
-            NullableController::class,
-            fn() => new NullableController()
-        );
+        $this->setInControllerMock(NullableController::class);
 
         $this->router->get('/nullable', NullableController::class, 'index');
 
@@ -795,10 +814,7 @@ final class RouterTest extends TestCase
     {
         RequestParameterController::$receivedArguments = [];
 
-        $this->container->set(
-            RequestParameterController::class,
-            fn() => new RequestParameterController()
-        );
+        $this->setInControllerMock(RequestParameterController::class);
 
         $this->router->get(
             '/request/{id}',
@@ -818,10 +834,7 @@ final class RouterTest extends TestCase
     {
         StringParameterController::$receivedValue = null;
 
-        $this->container->set(
-            StringParameterController::class,
-            fn() => new StringParameterController()
-        );
+        $this->setInControllerMock(StringParameterController::class);
 
         $this->router->get(
             '/string/{value}',
@@ -840,10 +853,7 @@ final class RouterTest extends TestCase
     {
         FakeController::$wasCalled = 0;
 
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
+        $this->setInControllerMock(FakeController::class);
 
         $registryFile = tempnam(sys_get_temp_dir(), 'velo-registry-');
         self::assertNotFalse($registryFile);
@@ -999,10 +1009,7 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$indexCalls = 0;
 
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get(
             '/head-fallback',
@@ -1028,10 +1035,7 @@ final class RouterTest extends TestCase
         FakeController::$wasCalled = 0;
         FakeController::$lastArgs = [];
 
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get(
             '/head-fallback/{id}',
@@ -1061,10 +1065,7 @@ final class RouterTest extends TestCase
         FakeController::$indexCalls = 0;
         FakeController::$headCalls = 0;
 
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->get(
             '/head-priority',
@@ -1094,11 +1095,6 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_returns_method_not_allowed_for_head_when_only_non_get_route_exists(): void
     {
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
-
         $this->router->post(
             '/head-not-allowed',
             FakeController::class,
@@ -1118,11 +1114,6 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_returns_all_allowed_methods_for_a_parameterized_path(): void
     {
-        $this->container->set(
-            FakeController::class,
-            fn() => new FakeController()
-        );
-
         $this->router->get(
             '/multi-method/{id}',
             FakeController::class,
@@ -1217,7 +1208,7 @@ final class RouterTest extends TestCase
             );
         }
     }
-    
+
     #[Test]
     public function it_throws_method_not_allowed_when_request_is_preflight_and_method_is_known_but_has_no_cors(): void
     {
@@ -1256,6 +1247,8 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_resolves_preflight_request_using_requested_method(): void
     {
+        $this->setInControllerMock(FakeController::class, ThrowingMiddleware::class);
+
         $route = $this->router->query('/users', FakeController::class, 'index')
             ->addMiddleware(ThrowingMiddleware::class);
 
@@ -1288,6 +1281,8 @@ final class RouterTest extends TestCase
     #[Test]
     public function it_resolves_preflight_request_for_parameterized_route_with_cors(): void
     {
+        $this->setInControllerMock(FakeController::class, ThrowingMiddleware::class);
+
         $route = $this->router->query('/users/{id}', FakeController::class, 'index')
             ->addMiddleware(ThrowingMiddleware::class);
 
@@ -1321,6 +1316,8 @@ final class RouterTest extends TestCase
     public function it_does_not_use_requested_preflight_method_for_regular_request(): void
     {
         FakeController::$wasCalled = 0;
+
+        $this->setInControllerMock(FakeController::class);
 
         $this->router->post('/users', FakeController::class, 'index');
 
@@ -1386,6 +1383,31 @@ final class RouterTest extends TestCase
             );
         }
     }
+
+    #[Test]
+    public function it_allows_mixed_controller_parameter_type(): void
+    {
+        FakeController::$wasCalled = 0;
+
+        $this->router->get(
+            '/users/{id}',
+            FakeController::class,
+            'mixedParamType'
+        );
+
+        $request = new Request('/users/42', RequestMethod::GET);
+
+        self::expectException(InvalidControllerSignatureException::class);
+        self::expectExceptionMessageIs(
+            InvalidControllerSignatureException::mixedTypeNotSupported(
+                FakeController::class,
+                'mixedParamType',
+                'id'
+            )->getMessage()
+        );
+
+        $this->router->resolve($request);
+    }
 }
 
 class FakeController
@@ -1436,6 +1458,14 @@ class FakeController
         self::$headCalls++;
 
         return new TextResponse('head');
+    }
+
+    public function mixedParamType(mixed $id): TextResponse
+    {
+        self::$wasCalled++;
+        self::$lastArgs = ['value' => $id];
+
+        return new TextResponse((string)$id);
     }
 }
 

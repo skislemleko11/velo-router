@@ -3,28 +3,18 @@ declare(strict_types=1);
 
 namespace Velo\Router\Router;
 
-use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use ReflectionException;
 use ReflectionIntersectionType;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionUnionType;
-use ValueError;
 use Velo\Http\Request;
 use Velo\Http\RequestMethod;
 use Velo\Http\Responses\Response;
-use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
-use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
-use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterIntersectionTypeException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterMissingTypeDeclarationException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\ParameterUnionTypeException;
-use Velo\Router\Router\Exceptions\InvalidParameterExceptions\UnexpectedInvalidParameterException;
+use Velo\Router\Router\Exceptions\InvalidControllerSignatureException;
 use Velo\Router\Router\Exceptions\MethodNotAllowedException;
-use Velo\Router\Router\Exceptions\MissingRequiredArgumentException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
 use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
@@ -129,22 +119,12 @@ class Router
     /**
      * Resolves the given Request.
      *
-     * @throws ContainerExceptionInterface
-     * @throws ControllerMethodInvalidReturnTypeException
-     * @throws MiddlewareNotFoundException
-     * @throws MissingRequiredArgumentException
-     * @throws MustImplementMiddlewareInterfaceException
-     * @throws NotFoundControllerException
-     * @throws NotFoundExceptionInterface
-     * @throws NotFoundControllerMethodException
-     * @throws RouteNotFound
-     * @throws ParameterMissingTypeDeclarationException
-     * @throws ParameterUnionTypeException
      * @throws ReflectionException
+     * @throws NotFoundControllerMethodException
+     * @throws NotFoundControllerException
+     * @throws InvalidControllerSignatureException
+     * @throws RouteNotFound
      * @throws MethodNotAllowedException
-     * @throws ParameterIntersectionTypeException
-     * @throws UnexpectedInvalidParameterException
-     * @throws ValueError
      */
     public function resolve(Request $request): Response
     {
@@ -166,22 +146,6 @@ class Router
     /**
      * Handles the given HEAD request by cloning it, changing method to GET and handling this request.
      *
-     * @throws ContainerExceptionInterface
-     * @throws MiddlewareNotFoundException
-     * @throws ControllerMethodInvalidReturnTypeException
-     * @throws MethodNotAllowedException
-     * @throws ParameterUnionTypeException
-     * @throws MissingRequiredArgumentException
-     * @throws MustImplementMiddlewareInterfaceException
-     * @throws NotFoundControllerMethodException
-     * @throws NotFoundExceptionInterface
-     * @throws UnexpectedInvalidParameterException
-     * @throws ParameterIntersectionTypeException
-     * @throws NotFoundControllerException
-     * @throws ReflectionException
-     * @throws RouteNotFound
-     * @throws ParameterMissingTypeDeclarationException
-     * @throws ValueError
      */
     private function handleHeadRequestIfNotRegistered(Request $request): Response
     {
@@ -195,19 +159,10 @@ class Router
      * Searchs for a matching Route for the given Request.
      * Calls callAction method if found.
      *
-     * @throws ContainerExceptionInterface
-     * @throws ControllerMethodInvalidReturnTypeException
-     * @throws MiddlewareNotFoundException
-     * @throws ParameterUnionTypeException
-     * @throws MissingRequiredArgumentException
-     * @throws MustImplementMiddlewareInterfaceException
-     * @throws NotFoundControllerMethodException
-     * @throws NotFoundExceptionInterface
-     * @throws NotFoundControllerException
      * @throws ReflectionException
-     * @throws ParameterMissingTypeDeclarationException
-     * @throws ParameterIntersectionTypeException
-     * @throws UnexpectedInvalidParameterException
+     * @throws NotFoundControllerMethodException
+     * @throws NotFoundControllerException
+     * @throws InvalidControllerSignatureException
      */
     private function findMatchAndExecute(Request $request): ?Response
     {
@@ -282,19 +237,10 @@ class Router
      *
      * @param array<string, string> $urlMethodArgs
      *
-     * @throws ContainerExceptionInterface
-     * @throws ControllerMethodInvalidReturnTypeException
-     * @throws MiddlewareNotFoundException
-     * @throws MissingRequiredArgumentException
-     * @throws MustImplementMiddlewareInterfaceException
      * @throws NotFoundControllerException
-     * @throws NotFoundExceptionInterface
      * @throws NotFoundControllerMethodException
-     * @throws ParameterMissingTypeDeclarationException
-     * @throws ParameterUnionTypeException
+     * @throws InvalidControllerSignatureException
      * @throws ReflectionException
-     * @throws ParameterIntersectionTypeException
-     * @throws UnexpectedInvalidParameterException
      */
     private function callAction(Route $route, Request $request, array $urlMethodArgs = []): Response
     {
@@ -323,11 +269,7 @@ class Router
      *
      * @return list<mixed>
      *
-     * @throws MissingRequiredArgumentException
-     * @throws ParameterMissingTypeDeclarationException
-     * @throws ParameterUnionTypeException
-     * @throws ParameterIntersectionTypeException
-     * @throws UnexpectedInvalidParameterException
+     * @throws InvalidControllerSignatureException
      * @throws ReflectionException
      */
     private function castMethodsArgsAndAddRequestToThemIfNeeded(
@@ -347,9 +289,7 @@ class Router
             $paramName = $param->getName();
 
             if (!$paramType) {
-                throw new ParameterMissingTypeDeclarationException(
-                    "Parameter $paramName of $className::$methodName is missing a type declaration!"
-                );
+                throw InvalidControllerSignatureException::missingTypeDeclaration($className, $methodName, $paramName);
             }
 
             if ($paramType instanceof ReflectionNamedType) {
@@ -361,6 +301,10 @@ class Router
                     $value = $args[$paramName];
 
                     if ($paramType->isBuiltin()) {
+                        if ($paramType->getName() === 'mixed') {
+                            throw InvalidControllerSignatureException::mixedTypeNotSupported($className, $methodName, $paramName);
+                        }
+
                         settype($value, $typeName);
                     }
 
@@ -370,23 +314,15 @@ class Router
                 } elseif ($paramType->allowsNull()) {
                     $castedArgs[] = null;
                 } else {
-                    throw new MissingRequiredArgumentException(
-                        "Missing required argument $paramName for method $className::$methodName()"
-                    );
+                    throw InvalidControllerSignatureException::missingRequiredArgument($className, $methodName, $paramName);
                 }
             } elseif ($paramType instanceof ReflectionUnionType) {
-                throw new ParameterUnionTypeException(
-                    "Parameter $paramName of $className::$methodName cannot be of a union type!"
-                );
+                throw InvalidControllerSignatureException::unionTypeNotSupported($className, $methodName, $paramName);
             } elseif ($paramType instanceof ReflectionIntersectionType) {
-                throw new ParameterIntersectionTypeException(
-                    "Parameter $paramName of $className::$methodName cannot be of an intersection type!"
-                );
+                throw InvalidControllerSignatureException::intersectionTypeNotSupported($className, $methodName, $paramName);
             } else {
                 // Probably it's not reachable in current(8.5) PHP, but I'm leaving it in case of future changes or bugs
-                throw new UnexpectedInvalidParameterException(
-                    "Parameter $paramName of $className::$methodName is of an invalid type!"
-                );
+                throw InvalidControllerSignatureException::unexpectedInvalidParameter($className, $methodName, $paramName);
             }
         }
 

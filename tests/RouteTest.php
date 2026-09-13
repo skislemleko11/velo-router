@@ -6,7 +6,6 @@ namespace Velo\Router\Tests;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 use Velo\Http\RequestMethod;
 use Velo\Router\Route;
 
@@ -28,7 +27,8 @@ final class RouteTest extends TestCase
     public function it_sets_middleware_and_returns_self(): void
     {
         $self = $this->route->addMiddleware('middleware');
-        self::assertSame(['middleware'], $this->getMiddlewaresProperty());
+
+        self::assertSame(['middleware'], $this->route->getMiddlewares());
         self::assertSame($this->route, $self);
     }
 
@@ -50,7 +50,8 @@ final class RouteTest extends TestCase
     public function it_sets_middleware_with_params_and_returns_self(): void
     {
         $self = $this->route->addMiddleware(['middleware', ['param1', 'param2']]);
-        self::assertSame([['middleware', ['param1', 'param2']]], $this->getMiddlewaresProperty());
+
+        self::assertSame([['middleware', ['param1', 'param2']]], $this->route->getMiddlewares());
         self::assertSame($this->route, $self);
     }
 
@@ -58,9 +59,10 @@ final class RouteTest extends TestCase
     public function it_sets_multiple_middlewares_and_returns_self(): void
     {
         $self = $this->route->addMiddlewares(['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]);
+
         self::assertSame(
             [['middleware1', ['param1', 'param2']], ['middleware2', ['param3']]],
-            $this->getMiddlewaresProperty()
+            $this->route->getMiddlewares()
         );
         self::assertSame($this->route, $self);
     }
@@ -75,6 +77,7 @@ final class RouteTest extends TestCase
     public function it_gets_middleware_and_returns_value(): void
     {
         $this->route->addMiddleware('middleware');
+
         self::assertSame('middleware', $this->route->getMiddleware(0));
     }
 
@@ -115,6 +118,7 @@ final class RouteTest extends TestCase
             'show',
             '#^/articles/(?P<slug>[a-z0-9-]+)$#'
         );
+
         $route->addMiddlewares('auth', ['rate-limit', ['60']]);
 
         /** @var Route $restoredRoute */
@@ -129,12 +133,5 @@ final class RouteTest extends TestCase
         self::assertSame('auth', $restoredRoute->getMiddleware(0));
         self::assertSame(['rate-limit', ['60']], $restoredRoute->getMiddleware(1));
         self::assertSame(2, $restoredRoute->getMiddlewaresCount());
-    }
-
-    private function getMiddlewaresProperty(): mixed
-    {
-        $reflection = new ReflectionClass(Route::class);
-        $reflectionProperty = $reflection->getProperty('middlewares');
-        return $reflectionProperty->getValue($this->route);
     }
 }

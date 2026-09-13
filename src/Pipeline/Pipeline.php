@@ -5,12 +5,10 @@ namespace Velo\Router\Pipeline;
 
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use Velo\Http\Request;
 use Velo\Http\Responses\Response;
 use Velo\Router\Middlewares\MiddlewareInterface;
 use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
-use Velo\Router\Pipeline\Exceptions\MiddlewareNotFoundException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Route;
 
@@ -39,10 +37,8 @@ final readonly class Pipeline
         $index = 0;
 
         /**
-         * @throws NotFoundExceptionInterface
          * @throws ContainerExceptionInterface
          * @throws MustImplementMiddlewareInterfaceException
-         * @throws MiddlewareNotFoundException
          */
         $next = function (Request $request) use (&$index, $middlewares, $destination, &$next) {
             if ($index >= count($middlewares)) {
