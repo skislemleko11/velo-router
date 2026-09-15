@@ -5,7 +5,6 @@ namespace Velo\Router\Pipeline\Exceptions;
 
 use Exception;
 use Velo\Http\Responses\Response;
-use Velo\Router\Pipeline\Exceptions\Interfaces\PipelineExceptionInterface;
 
 final class ControllerMethodInvalidReturnTypeException extends Exception implements PipelineExceptionInterface
 {

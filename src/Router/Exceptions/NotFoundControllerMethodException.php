@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Velo\Router\Router\Exceptions;
 
 use Velo\Exceptions\NotFoundException;
-use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
 
 final class NotFoundControllerMethodException extends NotFoundException implements RouterExceptionInterface
 {

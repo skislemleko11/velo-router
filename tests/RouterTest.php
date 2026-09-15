@@ -20,6 +20,7 @@ use Velo\Router\Pipeline\Exceptions\ControllerMethodInvalidReturnTypeException;
 use Velo\Router\Pipeline\Exceptions\MustImplementMiddlewareInterfaceException;
 use Velo\Router\Pipeline\Pipeline;
 use Velo\Router\Route;
+use Velo\Router\Router\CorsRouterExtensionInterface;
 use Velo\Router\Router\Exceptions\InvalidControllerSignatureException;
 use Velo\Router\Router\Exceptions\MethodNotAllowedException;
 use Velo\Router\Router\Exceptions\NotFoundControllerException;
@@ -27,7 +28,6 @@ use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
-use Velo\Router\Router\Interfaces\CorsRouterExtensionInterface;
 use Velo\Router\Router\Router;
 
 #[AllowMockObjectsWithoutExpectations]

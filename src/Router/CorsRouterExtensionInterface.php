@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Velo\Router\Router\Interfaces;
+namespace Velo\Router\Router;
 
 use Velo\Http\Request;
 use Velo\Http\RequestMethod;

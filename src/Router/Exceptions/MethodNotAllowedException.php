@@ -5,8 +5,7 @@ namespace Velo\Router\Router\Exceptions;
 
 use Exception;
 use Throwable;
-use Velo\Exceptions\Interfaces\HttpResponseExceptionWithHeadersInterface;
-use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
+use Velo\Exceptions\HttpResponseExceptionWithHeadersInterface;
 
 /**
  * It's thrown in Router class when the requested url is not found under the requested method, but under another one.

@@ -20,7 +20,6 @@ use Velo\Router\Router\Exceptions\NotFoundControllerMethodException;
 use Velo\Router\Router\Exceptions\RouteNotFound;
 use Velo\Router\Router\Exceptions\UnableToCacheRoutesException;
 use Velo\Router\Router\Exceptions\UnableToLoadRoutesException;
-use Velo\Router\Router\Interfaces\CorsRouterExtensionInterface;
 
 /**
  * Router class, it registers Routes and resolves Requests.

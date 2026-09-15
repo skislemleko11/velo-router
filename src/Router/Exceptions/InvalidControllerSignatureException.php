@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Velo\Router\Router\Exceptions;
 
 use Exception;
-use Velo\Router\Router\Exceptions\Interfaces\RouterExceptionInterface;
 
 final class InvalidControllerSignatureException extends Exception implements RouterExceptionInterface
 {
