@@ -148,8 +148,7 @@ class Router
      */
     private function handleHeadRequestIfNotRegistered(Request $request): Response
     {
-        $getRequest = clone $request;
-        $getRequest->changeMethodFromHeadToGet();
+        $getRequest = new Request($request->url, RequestMethod::GET);
 
         return $this->resolve($getRequest);
     }
