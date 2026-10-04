@@ -23,7 +23,7 @@ trait AddMiddlewaresTrait
      * because it will cause errors with caching Routes in Router class.
      * Use already instanciated objects and callables only for tests and development usage.
      */
-    public function addMiddleware(string|array|MiddlewareInterface|callable $middleware): self
+    public function addMiddleware(string|array|MiddlewareInterface|callable $middleware): static
     {
         $this->middlewares[] = $middleware;
 
@@ -40,7 +40,7 @@ trait AddMiddlewaresTrait
      * because it will cause errors with caching Routes in Router class.
      * Use already instanciated objects and callables only for tests and development usage.
      */
-    public function addMiddlewares(string|array|MiddlewareInterface|callable ...$middlewares): self
+    public function addMiddlewares(string|array|MiddlewareInterface|callable ...$middlewares): static
     {
         foreach ($middlewares as $middleware) {
             $this->addMiddleware($middleware);
